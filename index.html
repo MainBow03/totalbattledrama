@@ -3,1505 +3,1858 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Total Battle Drama</title>
+    <title>Elimination Party</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Roboto:wght@400;700&display=swap');
-        
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
-            background-size: 400% 400%;
-            animation: gradientBG 15s ease infinite;
-            color: white;
-            overflow-x: hidden;
-        }
-        
-        h1, h2, h3, .bangers { font-family: 'Bangers', cursive; letter-spacing: 2px; }
-
-        @keyframes gradientBG {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        .glass-panel {
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            border-radius: 1rem;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .character-card {
-            transition: transform 0.2s, box-shadow 0.2s;
-            cursor: pointer;
-        }
-        .character-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.5);
-        }
-        .character-card.selected { border: 4px solid #ffd700; filter: brightness(1.2); }
-        .character-card.taken { opacity: 0.4; pointer-events: none; filter: grayscale(100%); }
-        .character-card.eliminated { opacity: 0.3; filter: grayscale(100%); border: 2px solid red; }
-
-        .dice-roll-anim {
-            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both infinite;
-        }
-        
-        @keyframes shake {
-            10%, 90% { transform: translate3d(-1px, 0, 0) rotate(-5deg); }
-            20%, 80% { transform: translate3d(2px, 0, 0) rotate(5deg); }
-            30%, 50%, 70% { transform: translate3d(-4px, 0, 0) rotate(-5deg); }
-            40%, 60% { transform: translate3d(4px, 0, 0) rotate(5deg); }
-        }
-
-        .suspense-reveal {
-            opacity: 0;
-            animation: fadeIn 2s forwards;
-        }
-        @keyframes fadeIn { to { opacity: 1; } }
-
-        /* Memory Game Styles */
-        .memory-card {
-            width: 100%; aspect-ratio: 1;
-            background: #2d3748;
-            display: flex; justify-content: center; align-items: center;
-            font-size: 2rem; cursor: pointer; border-radius: 0.5rem;
-            transition: all 0.3s;
-        }
-        .memory-card.flipped { background: #cbd5e0; cursor: default; }
-        .memory-card.matched { background: #48bb78; color: white; cursor: default; }
-
-        /* Minefield Styles */
-        .mine-btn {
-            width: 100%; aspect-ratio: 1;
-            background: #4a5568; border-radius: 0.25rem;
-            transition: all 0.2s; cursor: pointer;
-        }
-        .mine-btn:hover { background: #718096; }
-        .mine-btn.safe { background: #48bb78; pointer-events: none; }
-        .mine-btn.lava { background: #f56565; pointer-events: none; }
-
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+        body { font-family: 'Poppins', sans-serif; background-color: transparent; color: white; overflow-x: hidden; }
         .hidden { display: none !important; }
-        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; }
-        .toast { background: rgba(0,0,0,0.8); color: white; padding: 1rem; margin-bottom: 0.5rem; border-radius: 0.5rem; border-left: 4px solid #ffd700; animation: slideIn 0.3s ease-out; }
-        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        /* Animations */
+        @keyframes pulse-glow { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
+        .animate-pulse-glow { animation: pulse-glow 2s infinite; }
+        
+        @keyframes roulette { 0% { transform: scale(1); opacity: 0.5; } 50% { transform: scale(1.1); opacity: 1; } 100% { transform: scale(1); opacity: 0.5; } }
+        .roulette-active { animation: roulette 0.2s infinite; border: 4px solid #fbbf24; }
+        
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .spin-wheel { transition: transform 3s cubic-bezier(0.25, 0.1, 0.25, 1); }
+
+        /* Grids */
+        .char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; }
+        .char-card { cursor: pointer; transition: transform 0.2s; border: 2px solid transparent; }
+        .char-card:hover:not(.taken) { transform: translateY(-5px); border-color: #3b82f6; }
+        .char-card.selected { border-color: #10b981; box-shadow: 0 0 10px #10b981; }
+        .char-card.taken { opacity: 0.4; filter: grayscale(100%); cursor: not-allowed; }
+
+        .game-grid { display: grid; gap: 4px; margin: 0 auto; }
+        .tile { background: #334155; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; transition: all 0.2s; }
+        .tile:hover:not(.revealed) { background: #475569; }
+        .tile.revealed { background: #1e293b; cursor: default; }
+        .tile.safe { background: #10b981; }
+        .tile.bomb { background: #ef4444; }
+        
+        /* Sequence Memory Circles */
+        .seq-circle { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: bold; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 2px solid transparent; }
+        .seq-circle:active { transform: scale(0.9); }
+        .seq-circle.closed { color: transparent; }
+        .seq-circle.open { cursor: default; border-color: white; }
+        .seq-circle.error { background-color: #ef4444 !important; color: white !important; animation: pulse 0.5s infinite; }
+
+        /* Memory Cards */
+        .memory-card { perspective: 1000px; cursor: pointer; }
+        .memory-card-inner { width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; position: relative; }
+        .memory-card.flipped .memory-card-inner { transform: rotateY(180deg); }
+        .memory-card-front, .memory-card-back { width: 100%; height: 100%; position: absolute; backface-visibility: hidden; display: flex; align-items: center; justify-content: center; border-radius: 0.5rem; }
+        .memory-card-front { background: #3b82f6; font-size: 2rem; }
+        .memory-card-back { background: #f8fafc; color: #0f172a; transform: rotateY(180deg); font-size: 2rem; font-weight: bold;}
+
+        /* Modals */
+        #notification-container { position: fixed; top: 20px; right: 20px; z-index: 50; display: flex; flex-direction: column; gap: 10px; }
+        .notification { background: #1e293b; border-left: 4px solid #3b82f6; padding: 15px 20px; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: opacity 0.3s; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col p-4 md:p-8">
+<body class="h-screen flex flex-col bg-gradient-to-br from-indigo-900 via-purple-900 to-slate-900">
 
-    <div id="toast-container"></div>
+    <div id="notification-container"></div>
+    <div id="youtube-player-container" class="hidden"></div>
 
-    <!-- MAIN CONTAINER -->
-    <div id="app" class="max-w-6xl mx-auto w-full flex-grow flex flex-col hidden glass-panel p-6">
-        
-        <!-- HEADER -->
-        <header class="flex justify-between items-center mb-6 border-b border-gray-600 pb-4">
-            <h1 class="text-4xl text-yellow-400 drop-shadow-md">T.B.D.</h1>
-            <div class="flex gap-4 text-sm md:text-base">
-                <span id="header-room" class="font-bold text-gray-300">Stanza: ---</span>
-                <span id="header-user" class="font-bold text-gray-300">Utente: ---</span>
-                <span id="header-phase" class="font-bold text-yellow-300">Fase: ---</span>
-            </div>
-        </header>
-
-        <!-- VIEW: MENU -->
-        <div id="view-menu" class="view-section flex flex-col items-center justify-center flex-grow">
-            <h2 class="text-5xl mb-8 text-center text-yellow-400 drop-shadow-lg bangers">Total Battle Drama</h2>
-            <div class="w-full max-w-md flex flex-col gap-4">
-                <input type="text" id="nickname-input" placeholder="Il tuo Nickname" class="p-3 rounded bg-gray-800 border border-gray-600 focus:border-yellow-400 outline-none w-full text-center text-xl">
-                
-                <div class="grid grid-cols-2 gap-4 mt-4">
-                    <button id="btn-create-room" class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded text-xl shadow-lg transition">Crea Stanza</button>
-                    <button id="btn-join-room-modal" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded text-xl shadow-lg transition">Unisciti</button>
-                </div>
-                
-                <div id="join-area" class="hidden flex-col gap-2 mt-4 p-4 bg-gray-800 rounded">
-                    <input type="text" id="room-code-input" placeholder="Codice Stanza" class="p-2 rounded bg-gray-700 border border-gray-600 outline-none text-center font-mono">
-                    <button id="btn-join-room" class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded">Entra</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- VIEW: HOST CONFIG -->
-        <div id="view-config" class="view-section hidden flex flex-col items-center flex-grow">
-            <h2 class="text-4xl mb-6 text-yellow-400">Configurazione Partita</h2>
-            <div class="w-full max-w-lg bg-gray-800 p-6 rounded-lg flex flex-col gap-6">
-                <div>
-                    <label class="block mb-2 font-bold text-gray-300">Numero Totale Concorrenti (4 - 22)</label>
-                    <input type="number" id="config-players" min="4" max="22" value="14" class="w-full p-2 rounded bg-gray-700 text-white">
-                    <p class="text-sm text-gray-400 mt-1">I posti vuoti saranno riempiti dai BOT.</p>
-                </div>
-                <div>
-                    <label class="block mb-2 font-bold text-gray-300">Ritorno Eliminati?</label>
-                    <select id="config-returnees" class="w-full p-2 rounded bg-gray-700 text-white">
-                        <option value="0">Nessun Ritorno</option>
-                        <option value="1">1 Ritorno (Episodio Centrale)</option>
-                    </select>
-                </div>
-                <button id="btn-save-config" class="bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-3 rounded text-xl mt-4">Vai alla Lobby</button>
-            </div>
-        </div>
-
-        <!-- VIEW: LOBBY -->
-        <div id="view-lobby" class="view-section hidden flex flex-col flex-grow">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-3xl text-yellow-400">Scegli il tuo Personaggio</h2>
-                <div class="text-xl">Giocatori: <span id="lobby-count">0/0</span></div>
-            </div>
-            
-            <div id="character-grid" class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4 overflow-y-auto max-h-[50vh] p-2 bg-gray-800 rounded-lg">
-                <!-- Inserito via JS -->
-            </div>
-
-            <div class="mt-8 flex justify-center">
-                <button id="btn-start-game" class="hidden bg-red-600 hover:bg-red-500 text-white font-bold py-4 px-12 rounded-full text-2xl shadow-lg bangers tracking-wider animate-pulse">AVVIA PARTITA</button>
-                <div id="waiting-host-msg" class="text-xl text-gray-300 italic">In attesa che l'host avvii la partita...</div>
-            </div>
-        </div>
-
-        <!-- VIEW: SOCIAL -->
-        <div id="view-social" class="view-section hidden flex flex-col flex-grow">
-            <div class="text-center mb-6">
-                <h2 class="text-4xl text-blue-400 bangers mb-2">Fase 1: Social & Strategia</h2>
-                <p class="text-gray-300">Clicca su un giocatore per interagire. Hai 1 azione a disposizione.</p>
-            </div>
-            
-            <!-- My Status -->
-            <div id="social-my-status" class="bg-gray-800 p-4 rounded-lg mb-6 flex justify-between items-center border border-gray-600">
-                <!-- JS populated -->
-            </div>
-
-            <div id="social-grid" class="flex flex-wrap justify-center gap-6">
-                <!-- JS populated with players -->
-            </div>
-        </div>
-
-        <!-- MODAL: SOCIAL ACTIONS -->
-        <div id="modal-social-action" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
-            <div class="bg-gray-900 border-2 border-yellow-500 p-6 rounded-lg max-w-sm w-full">
-                <h3 class="text-2xl font-bold mb-4 text-center" id="social-target-name">Target</h3>
-                <div class="flex flex-col gap-3">
-                    <button class="social-btn bg-green-600 hover:bg-green-500 p-3 rounded text-left flex justify-between" data-action="friendship">
-                        <span><i class="fas fa-handshake mr-2"></i> Amicizia (50%)</span> <span class="text-sm">+1 P.to</span>
-                    </button>
-                    <button class="social-btn bg-blue-600 hover:bg-blue-500 p-3 rounded text-left flex justify-between" data-action="alliance">
-                        <span><i class="fas fa-shield-alt mr-2"></i> Alleanza (50%)</span> <span class="text-sm text-gray-300">Req: >0 Amicizia</span>
-                    </button>
-                    <button class="social-btn bg-pink-600 hover:bg-pink-500 p-3 rounded text-left flex justify-between" data-action="flirt">
-                        <span><i class="fas fa-heart mr-2"></i> Flirt (40%)</span> <span class="text-sm">+20 P.ti / -2</span>
-                    </button>
-                    <button class="social-btn bg-yellow-600 hover:bg-yellow-500 p-3 rounded text-left flex justify-between" data-action="suckup">
-                        <span><i class="fas fa-shoe-prints mr-2"></i> Leccapiedi (40%)</span> <span class="text-sm">+3 Target / -1 Bot</span>
-                    </button>
-                    <button class="social-btn bg-red-600 hover:bg-red-500 p-3 rounded text-left flex justify-between" data-action="sabotage">
-                        <span><i class="fas fa-bolt mr-2"></i> Sabotaggio (50%)</span> <span class="text-sm">-1 a Target e un altro</span>
-                    </button>
-                </div>
-                <button id="btn-close-social-modal" class="mt-4 w-full text-gray-400 hover:text-white">Annulla</button>
-            </div>
-        </div>
-        
-        <!-- MODAL: SELECT SECOND TARGET FOR SABOTAGE -->
-        <div id="modal-sabotage-target" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4">
-             <div class="bg-gray-900 border-2 border-red-500 p-6 rounded-lg max-w-sm w-full">
-                 <h3 class="text-xl font-bold mb-4">Scegli la seconda vittima:</h3>
-                 <div id="sabotage-targets-list" class="max-h-60 overflow-y-auto flex flex-col gap-2"></div>
-                 <button id="btn-close-sabo-modal" class="mt-4 w-full text-gray-400 hover:text-white">Annulla</button>
-             </div>
-        </div>
-
-        <!-- VIEW: IMMUNITY CHALLENGE -->
-        <div id="view-immunity" class="view-section hidden flex flex-col flex-grow items-center">
-            <h2 class="text-4xl text-yellow-400 bangers mb-4">Fase 2: Sfida Immunità</h2>
-            <p class="text-xl mb-8">Lancia il dado a 15 facce! Chi fa di più è immune.</p>
-            
-            <div id="dice-container" class="bg-gray-800 p-8 rounded-full border-4 border-yellow-500 w-48 h-48 flex items-center justify-center cursor-pointer hover:bg-gray-700 transition shadow-2xl">
-                <span id="my-dice-result" class="text-6xl font-bold bangers text-white">ROLL</span>
-            </div>
-            
-            <div class="mt-8 w-full bg-gray-900 rounded-lg p-4">
-                <h3 class="text-xl text-center mb-4 text-gray-400">Risultati</h3>
-                <div id="immunity-results-grid" class="grid grid-cols-3 md:grid-cols-5 gap-4 text-center">
-                    <!-- JS Populated -->
-                </div>
-            </div>
-            
-            <div id="immunity-winner-msg" class="hidden mt-6 text-3xl text-green-400 bangers animate-pulse text-center"></div>
-        </div>
-
-        <!-- VIEW: VOTING CEREMONY -->
-        <div id="view-voting" class="view-section hidden flex flex-col flex-grow items-center">
-            <h2 class="text-5xl text-red-500 bangers mb-4 drop-shadow-[0_0_10px_rgba(255,0,0,0.8)]">Cerimonia di Eliminazione</h2>
-            <p class="text-xl mb-6 text-gray-300 text-center">Vota un concorrente. L'immune non può essere votato.</p>
-            
-            <div id="voting-grid" class="flex flex-wrap justify-center gap-4 max-w-4xl">
-                <!-- JS Populated -->
-            </div>
-            <div id="voting-waiting" class="hidden mt-8 text-2xl text-yellow-300">Hai votato. In attesa degli altri...</div>
-        </div>
-
-        <!-- VIEW: SUSPENSE (Vote Reveal) -->
-        <div id="view-suspense" class="view-section hidden flex flex-col flex-grow items-center justify-center">
-            <h2 class="text-4xl bangers mb-8">Lettura dei Voti...</h2>
-            <div id="suspense-text" class="text-3xl text-center leading-relaxed max-w-2xl min-h-[100px]">
-                <!-- Animates in JS -->
-            </div>
-            <div id="nominees-reveal" class="hidden mt-8 flex flex-col items-center">
-                <h3 class="text-3xl text-red-500 font-bold mb-4">A RISCHIO ELIMINAZIONE:</h3>
-                <div id="nominees-portraits" class="flex gap-6"></div>
-                <p id="minigame-announcement" class="mt-6 text-2xl text-yellow-400 font-bold bangers animate-pulse"></p>
-            </div>
-        </div>
-
-        <!-- VIEW: MINIGAME AREA -->
-        <div id="view-minigame" class="view-section hidden flex flex-col flex-grow items-center">
-            <h2 id="minigame-title" class="text-4xl text-yellow-400 bangers mb-2">Minigioco</h2>
-            <p id="minigame-desc" class="text-gray-300 mb-6 text-center max-w-2xl"></p>
-            
-            <!-- Dynamic Minigame Container -->
-            <div id="minigame-container" class="w-full max-w-2xl bg-gray-800 p-6 rounded-lg border border-gray-600 shadow-2xl relative">
-                <!-- Injected via JS -->
-            </div>
-            
-            <!-- Minigame Status Board -->
-            <div id="minigame-status" class="mt-6 flex gap-8 text-xl font-bold bg-gray-900 p-4 rounded-full border border-gray-700"></div>
-        </div>
-        
-        <!-- VIEW: FINALE -->
-        <div id="view-finale" class="view-section hidden flex flex-col flex-grow items-center">
-            <h2 class="text-6xl text-yellow-500 bangers mb-4 drop-shadow-[0_0_15px_rgba(255,215,0,0.8)]">LA FINALE!</h2>
-            <p class="text-xl mb-8">Scontro epico al meglio delle 3 sfide!</p>
-            <div id="finale-combatants" class="flex gap-12 items-center mb-8"></div>
-            <div id="finale-score" class="text-4xl font-bold mb-8 tracking-widest text-center">0 - 0</div>
-            
-            <div id="finale-minigame-area" class="w-full flex justify-center"></div>
-        </div>
-
-        <!-- VIEW: RANKING (END) -->
-        <div id="view-ranking" class="view-section hidden flex flex-col flex-grow items-center overflow-hidden">
-            <h2 class="text-5xl text-yellow-400 bangers mb-6">Classifica Finale</h2>
-            <div id="ranking-list" class="w-full max-w-md bg-gray-800 rounded-lg p-4 overflow-y-auto max-h-[60vh] flex flex-col gap-2">
-                <!-- JS Populated -->
-            </div>
-            <button onclick="location.reload()" class="mt-6 bg-blue-600 hover:bg-blue-500 p-3 rounded font-bold">Torna alla Home</button>
-        </div>
-
+    <!-- Global Host DJ Booth -->
+    <div id="dj-booth" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex items-center gap-2 bg-slate-900/90 p-2 rounded-full backdrop-blur border border-purple-500/50 shadow-lg hidden">
+        <span class="text-xs text-purple-400 font-bold ml-2">🎵 DJ (YouTube):</span>
+        <input type="text" id="input-youtube" class="bg-slate-800 text-xs text-white p-1 px-2 rounded-full w-32 md:w-48 border border-slate-700 focus:outline-none focus:border-purple-500" placeholder="Es: https://youtu.be/...">
+        <button onclick="actions.set_music()" class="bg-purple-600 hover:bg-purple-500 text-xs px-3 py-1 rounded-full font-bold transition-colors">Play</button>
+        <button onclick="actions.stop_music()" class="bg-red-600 hover:bg-red-500 text-xs px-3 py-1 rounded-full font-bold transition-colors mr-1">Stop</button>
     </div>
 
-    <!-- Firebase SDK Imports -->
+    <!-- MAIN MENU -->
+    <div id="screen-menu" class="flex-1 flex flex-col items-center justify-center p-4">
+        <h1 class="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 mb-8 text-center">ELIMINATION<br>PARTY</h1>
+        
+        <div class="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-300 mb-2">Scegli il tuo Nickname</label>
+                <input type="text" id="input-nickname" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500" placeholder="Es. Player123" maxlength="15">
+            </div>
+            <div class="space-y-4">
+                <button onclick="ui.showScreen('create')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Crea Stanza (Host)</button>
+                <button onclick="ui.showScreen('join')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Unisciti a una Stanza</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CREATE ROOM -->
+    <div id="screen-create" class="hidden flex-1 flex flex-col items-center justify-center p-4">
+        <div class="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-6 text-center">Impostazioni Stanza</h2>
+            
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label class="block text-sm text-slate-300 mb-1">Giocatori Totali (10-30)</label>
+                    <input type="number" id="input-total-players" min="10" max="30" value="15" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white" onchange="logic.updateNPCCount()">
+                </div>
+                <div>
+                    <label class="block text-sm text-slate-300 mb-1">Giocatori Umani Max</label>
+                    <input type="number" id="input-human-players" min="1" max="30" value="5" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white" onchange="logic.updateNPCCount()">
+                </div>
+                <div class="p-3 bg-slate-700 rounded-lg flex justify-between items-center">
+                    <span>NPC (Bot) generati:</span>
+                    <span id="display-npc-count" class="font-bold text-blue-400">10</span>
+                </div>
+            </div>
+            
+            <div class="flex gap-3">
+                <button onclick="ui.showScreen('menu')" class="flex-1 bg-slate-600 hover:bg-slate-500 text-white py-2 rounded-lg">Indietro</button>
+                <button onclick="logic.createRoom()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg">Crea Lobby</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JOIN ROOM -->
+    <div id="screen-join" class="hidden flex-1 flex flex-col items-center justify-center p-4">
+        <div class="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 class="text-2xl font-bold mb-6 text-center">Unisciti</h2>
+            <div class="mb-6">
+                <label class="block text-sm text-slate-300 mb-2">Codice Stanza (6 caratteri)</label>
+                <input type="text" id="input-room-code" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-purple-500 uppercase text-center text-2xl tracking-widest" maxlength="6">
+            </div>
+            <div class="flex gap-3">
+                <button onclick="ui.showScreen('menu')" class="flex-1 bg-slate-600 hover:bg-slate-500 text-white py-2 rounded-lg">Indietro</button>
+                <button onclick="logic.joinRoom()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-lg">Entra</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOBBY (CHARACTER SELECT) -->
+    <div id="screen-lobby" class="hidden flex-1 flex flex-col h-full">
+        <div class="bg-slate-800 p-4 shadow-md flex justify-between items-center z-10">
+            <div>
+                <h2 class="text-xl font-bold">Lobby <span id="lobby-room-code" class="text-blue-400 tracking-widest ml-2 bg-slate-900 px-2 py-1 rounded select-all"></span></h2>
+                <p class="text-sm text-slate-400">Giocatori: <span id="lobby-player-count">0/0</span></p>
+            </div>
+            <div class="flex gap-4 items-center">
+                <div id="lobby-status" class="text-yellow-400 font-semibold text-sm">In attesa dei giocatori...</div>
+                <button id="btn-ready" onclick="logic.toggleReady()" class="bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-6 rounded-lg transition-colors hidden">PRONTO</button>
+                <button id="btn-start-game" onclick="logic.startGame()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hidden opacity-50 cursor-not-allowed" disabled>Inizia Partita</button>
+            </div>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-4 md:p-8">
+            <h3 class="text-center text-2xl font-bold mb-6">Scegli il tuo Personaggio</h3>
+            <div id="character-grid" class="char-grid max-w-6xl mx-auto">
+                <!-- Generato via JS -->
+            </div>
+        </div>
+        
+        <div class="bg-slate-900 p-4 border-t border-slate-700">
+            <h4 class="text-sm font-bold text-slate-400 mb-2">Giocatori Connessi</h4>
+            <div id="lobby-players-list" class="flex flex-wrap gap-2">
+                <!-- Generato via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div id="screen-game" class="hidden flex-1 flex flex-col h-full bg-white/5 backdrop-blur-sm">
+        
+        <!-- Header Partita -->
+        <div class="bg-slate-900/60 backdrop-blur border-b border-white/10 p-3 flex justify-between items-center">
+            <div>
+                <h2 class="text-lg font-bold text-blue-400">Round <span id="game-round-number">1</span></h2>
+                <p class="text-xs text-slate-300">Vivi: <span id="game-alive-count">0</span> | Sfida a: <span id="game-challenge-type">3</span></p>
+            </div>
+            <div id="game-phase-indicator" class="font-bold text-yellow-400 uppercase tracking-widest">Attesa...</div>
+        </div>
+
+        <!-- Main Game Area -->
+        <div class="flex-1 flex flex-col md:flex-row relative">
+            
+            <!-- Sidebar Sinistra: Giocatori Vivi -->
+            <div class="w-full md:w-48 lg:w-64 bg-slate-900/40 border-r border-white/10 overflow-y-auto p-2 hidden md:block backdrop-blur-md">
+                <h3 class="text-xs font-bold text-slate-400 uppercase mb-2 pl-2">In Gara</h3>
+                <div id="game-alive-list" class="space-y-1"></div>
+            </div>
+
+            <!-- Centro: Area di Gioco / Suspense -->
+            <div class="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+                
+                <!-- Schermata Suspense Selezione -->
+                <div id="suspense-container" class="hidden absolute inset-0 bg-slate-900/95 z-20 flex flex-col items-center justify-center">
+                    <h2 class="text-3xl font-bold mb-8 text-center">Selezione Sfidanti...</h2>
+                    <div id="suspense-slots" class="flex gap-4 md:gap-8 flex-wrap justify-center">
+                        <!-- Slots generati via JS -->
+                    </div>
+                </div>
+
+                <!-- Area Minigioco -->
+                <div id="minigame-container" class="hidden w-full max-w-4xl bg-slate-800 rounded-xl shadow-2xl p-6 flex flex-col items-center border border-slate-700">
+                    <h2 id="minigame-title" class="text-3xl font-extrabold text-blue-400 mb-2 uppercase tracking-wider text-center">Nome Gioco</h2>
+                    <p id="minigame-desc" class="text-slate-300 text-center mb-6">Descrizione del minigioco e regole.</p>
+                    
+                    <div id="minigame-players-hud" class="w-full flex justify-center gap-4 md:gap-12 mb-6">
+                        <!-- HUD giocatori sfidanti (Vite, Punti) -->
+                    </div>
+
+                    <!-- Render Area Specifica del Minigioco -->
+                    <div id="minigame-render-area" class="w-full flex justify-center items-center min-h-[300px]">
+                        <!-- Il contenuto varia dinamicamente -->
+                    </div>
+                    
+                    <div id="minigame-controls" class="mt-6 w-full flex justify-center gap-4">
+                        <!-- Pulsanti d'azione (Es. Tira Dado, Vota) -->
+                    </div>
+                </div>
+
+                <!-- Risultato Round -->
+                <div id="round-result-container" class="hidden absolute inset-0 bg-red-900/90 z-30 flex flex-col items-center justify-center text-center p-4 backdrop-blur-sm">
+                    <h2 class="text-5xl font-black text-white mb-4 uppercase drop-shadow-lg">ELIMINAZIONE</h2>
+                    <div id="eliminated-players" class="flex flex-wrap justify-center gap-6 mb-8"></div>
+                    <button id="btn-next-round" class="hidden bg-white text-red-900 font-bold py-3 px-8 rounded-full text-xl hover:scale-105 transition-transform">Prossimo Round</button>
+                </div>
+
+            </div>
+
+            <!-- Sidebar Destra: Eliminati & Chat -->
+            <div class="w-full md:w-56 lg:w-72 bg-slate-900/40 border-l border-white/10 hidden md:flex flex-col backdrop-blur-md">
+                <!-- Eliminati -->
+                <div class="p-3 border-b border-white/10 h-1/3 flex flex-col">
+                    <h3 class="text-xs font-bold text-red-400 uppercase mb-2">Eliminati</h3>
+                    <div id="game-dead-list" class="space-y-1 overflow-y-auto flex-1"></div>
+                </div>
+                <!-- Chat -->
+                <div class="p-3 flex flex-col flex-1">
+                    <h3 class="text-xs font-bold text-blue-300 uppercase mb-2">Chat Globale</h3>
+                    <div id="game-chat-messages" class="flex-1 overflow-y-auto space-y-2 mb-2 text-sm pr-1"></div>
+                    <div class="flex gap-2 mt-auto">
+                        <input type="text" id="input-chat" class="flex-1 bg-slate-800/80 border border-white/20 rounded p-2 text-white text-xs focus:outline-none focus:border-blue-500" placeholder="Scrivi messaggio..." onkeypress="if(event.key === 'Enter') actions.send_chat()">
+                        <button onclick="actions.send_chat()" class="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-xs font-bold transition-colors">Invia</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- STATS SCREEN (FINALE) -->
+    <div id="screen-stats" class="hidden flex-1 flex flex-col p-4 md:p-8 overflow-y-auto">
+        <div class="max-w-4xl mx-auto w-full">
+            <div class="text-center mb-10">
+                <h1 class="text-5xl md:text-7xl font-black text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.5)] mb-2">CAMPIONE</h1>
+                <div id="winner-display" class="flex flex-col items-center justify-center mt-6"></div>
+            </div>
+
+            <div class="bg-slate-800 rounded-xl p-6 shadow-xl">
+                <h2 class="text-2xl font-bold border-b border-slate-700 pb-3 mb-4">Classifica e Statistiche</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-900 text-slate-300 text-sm uppercase">
+                                <th class="p-3 rounded-tl-lg">Pos</th>
+                                <th class="p-3">Giocatore</th>
+                                <th class="p-3 text-center">Sfide Giocate</th>
+                                <th class="p-3 text-center">Sfide Vinte</th>
+                                <th class="p-3 text-center rounded-tr-lg">Vite Perse</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stats-table-body" class="text-sm">
+                            <!-- JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-8 text-center">
+                    <button onclick="location.reload()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg">Torna al Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIREBASE & LOGIC SCRIPT -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, updateDoc, onSnapshot, collection, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ==========================================
-        // CONFIGURAZIONE FIREBASE (CANVAS / GITHUB)
-        // ==========================================
-        
-        // --- INIZIO BLOCCO DA SOSTITUIRE SU GITHUB PAGES ---
-        // Se esegui su Github Pages, cancella il blocco sotto e usa la TUA config che mi hai dato nel prompt.
-        let firebaseConfig;
-let appId = 'torneo-100-v5'; // Oppure il nome che preferisci
-
-try {
-    // Prova a leggere la configurazione automatica del Canvas
-    firebaseConfig = JSON.parse(__firebase_config);
-    appId = typeof __app_id !== 'undefined' ? __app_id : appId;
-} catch (e) {
-    // Se non esiste (sei su GitHub), usa i tuoi dati reali
-    firebaseConfig = {
-        apiKey: "AIzaSyBSZczSM2hv9gcmcOKSD6ICFROF5xcFmTE",
-        authDomain: "totalbattledrama.firebaseapp.com",
-        projectId: "totalbattledrama",
-        storageBucket: "totalbattledrama.firebasestorage.app",
-        messagingSenderId: "550715197163",
-        appId: "1:550715197163:web:ef4181ae302ccb6a9060ae",
-        measurementId: "G-KFFR9ZT0C4"
-    };
-        }
-        // --- FINE BLOCCO DA SOSTITUIRE SU GITHUB PAGES ---
-
-        const appFirebase = initializeApp(firebaseConfig);
-        const auth = getAuth(appFirebase);
-        const db = getFirestore(appFirebase);
-
-        // ==========================================
-        // DATA GLOBALE & COSTANTI
+        // COSTANTI E DATI
         // ==========================================
         const CHARACTERS = [
-            { id: 'c1', name: 'Tom', img: 'https://i.pinimg.com/736x/db/d4/2a/dbd42a105be5cd57fa6a0ed9a8ab7df8.jpg' },
-            { id: 'c2', name: 'Jake', img: 'https://i.pinimg.com/736x/09/cb/93/09cb935d20ccac3df1d95df305e3ff75.jpg' },
-            { id: 'c3', name: 'Aiden', img: 'https://i.pinimg.com/736x/5a/d2/c3/5ad2c35deb3dccf1b841c7ef0b90d20d.jpg' },
-            { id: 'c4', name: 'James', img: 'https://i.pinimg.com/736x/34/ff/11/34ff1148ca010cd4707d04a36671c5b0.jpg' },
-            { id: 'c5', name: 'Alec', img: 'https://i.pinimg.com/736x/7b/60/f7/7b60f7771dee70c36cd5f112cbbe5c72.jpg' },
-            { id: 'c6', name: 'Yul', img: 'https://i.pinimg.com/736x/a5/30/4d/a5304da542508a1b573db7e2dd8faed0.jpg' },
-            { id: 'c7', name: 'Ted', img: 'https://i.pinimg.com/736x/5c/f9/45/5cf945a3ea7f6799a3f09ee12f6a8b52.jpg' },
-            { id: 'c8', name: 'Spencer', img: 'https://i.pinimg.com/736x/1a/a6/94/1aa69432bc0438f9a30f595ff4693afa.jpg' },
-            { id: 'c9', name: 'Tristan', img: 'https://i.pinimg.com/736x/79/af/6a/79af6a0030b12fc9c98711126e0c967b.jpg' },
-            { id: 'c10', name: 'Sam', img: 'https://i.pinimg.com/736x/e5/6c/81/e56c81223973fb5eca0553aa8e94d322.jpg' },
-            { id: 'c11', name: 'Finn', img: 'https://i.pinimg.com/736x/b0/4f/d2/b04fd2a83f8d6a86c363ef8c2cedd1b8.jpg' },
-            { id: 'c12', name: 'Benji', img: 'https://i.pinimg.com/736x/d0/c2/aa/d0c2aa78daf761a02dfcc6d431153b1b.jpg' },
-            { id: 'c13', name: 'Connor', img: 'https://i.pinimg.com/736x/b9/14/1b/b9141b224920baf23e6e18a28fec281e.jpg' },
-            { id: 'c14', name: 'Ellie', img: 'https://i.pinimg.com/736x/fc/7f/74/fc7f741c4f8d55ecbef60cfb1d9ae41c.jpg' },
-            { id: 'c15', name: 'Gabby', img: 'https://i.pinimg.com/736x/a9/02/f6/a902f64bb2fad9ea7c0ef3fb8378eefb.jpg' },
-            { id: 'c16', name: 'Miriam', img: 'https://i.pinimg.com/736x/20/32/bf/2032bf76dbdf63b46ae9700a0f110e96.jpg' },
-            { id: 'c17', name: 'Fiore', img: 'https://i.pinimg.com/736x/97/ed/43/97ed439990f0819b9441ea5503d36bf9.jpg' },
-            { id: 'c18', name: 'Ashley', img: 'https://i.pinimg.com/736x/f4/12/54/f41254f60d4c222cf59e1abbb4b0ae99.jpg' },
-            { id: 'c19', name: 'Tess', img: 'https://i.pinimg.com/736x/b4/0c/3a/b40c3ac96de25749753dee44ecb90196.jpg' },
-            { id: 'c20', name: 'Rosa Maria', img: 'https://i.pinimg.com/736x/43/26/f6/4326f60c5e78b7f88d54fdb7baa60881.jpg' },
-            { id: 'c21', name: 'Ally', img: 'https://i.pinimg.com/736x/ec/24/83/ec24830448fe0a21b25a7cf024e97298.jpg' },
-            { id: 'c22', name: 'Riya', img: 'https://i.pinimg.com/736x/a7/5c/06/a75c06e65abb45f19c2edabfedb93646.jpg' },
-            { id: 'c23', name: 'Anastasia', img: 'https://i.pinimg.com/736x/0d/7f/27/0d7f27b981d5924dea8f94d0c07aa583.jpg' },
-            { id: 'c24', name: 'Isabelle', img: 'https://i.pinimg.com/736x/5e/1a/f6/5e1af69ac6196b02e015133b3de84fd3.jpg' },
-            { id: 'c25', name: 'Ara', img: 'https://i.pinimg.com/736x/82/a4/d1/82a4d1b5a6a655d51588fa862b55b907.jpg' },
-            { id: 'c26', name: 'Dunia', img: 'https://i.pinimg.com/736x/14/80/4c/14804cea0cddd20025cc9ecc6bfaf3dc.jpg' },
-            { id: 'c27', name: 'Maggy', img: 'https://i.pinimg.com/736x/40/83/56/408356d6134bbf2c44d38884e7923d12.jpg' },
-            { id: 'c28', name: 'Robin', img: 'https://i.pinimg.com/736x/3f/11/0c/3f110cad03ab3735e538c20ff238697d.jpg' },
-            { id: 'c29', name: 'Superboy', img: 'https://i.pinimg.com/736x/5d/44/90/5d44907fb73b58a4a91134a9f25c0b2d.jpg' },
-            { id: 'c30', name: 'Zuko', img: 'https://i.pinimg.com/736x/86/b6/f3/86b6f3d6f859ea16d4e0d3d55e8bf3e4.jpg' },
-            { id: 'c31', name: 'Wario', img: 'https://i.pinimg.com/736x/07/72/16/07721681614a459938a7f85ec450f957.jpg' },
-            { id: 'c32', name: 'Marceline', img: 'https://i.pinimg.com/736x/b1/d9/be/b1d9bef151f48cc0585d578e31b79cce.jpg' },
-            { id: 'c33', name: 'Lapis', img: 'https://i.pinimg.com/1200x/09/fb/12/09fb12467957da96913fc8f75e6f6356.jpg' },
-            { id: 'c34', name: 'Mandy', img: 'https://i.pinimg.com/736x/70/49/ec/7049ec241db0be8cb0a9642d2b3351cd.jpg' },
-            { id: 'c35', name: 'Wanda', img: 'https://i.pinimg.com/736x/76/63/2c/76632cdd5765893ba8fbe9de12485dff.jpg' }
+            { id: 'c1', name: 'Tom', url: 'https://i.pinimg.com/736x/db/d4/2a/dbd42a105be5cd57fa6a0ed9a8ab7df8.jpg' },
+            { id: 'c2', name: 'Jake', url: 'https://i.pinimg.com/736x/09/cb/93/09cb935d20ccac3df1d95df305e3ff75.jpg' },
+            { id: 'c3', name: 'Aiden', url: 'https://i.pinimg.com/736x/5a/d2/c3/5ad2c35deb3dccf1b841c7ef0b90d20d.jpg' },
+            { id: 'c4', name: 'James', url: 'https://i.pinimg.com/736x/34/ff/11/34ff1148ca010cd4707d04a36671c5b0.jpg' },
+            { id: 'c5', name: 'Alec', url: 'https://i.pinimg.com/736x/7b/60/f7/7b60f7771dee70c36cd5f112cbbe5c72.jpg' },
+            { id: 'c6', name: 'Yul', url: 'https://i.pinimg.com/736x/a5/30/4d/a5304da542508a1b573db7e2dd8faed0.jpg' },
+            { id: 'c7', name: 'Ted', url: 'https://i.pinimg.com/736x/5c/f9/45/5cf945a3ea7f6799a3f09ee12f6a8b52.jpg' },
+            { id: 'c8', name: 'Spencer', url: 'https://i.pinimg.com/736x/1a/a6/94/1aa69432bc0438f9a30f595ff4693afa.jpg' },
+            { id: 'c9', name: 'Tristan', url: 'https://i.pinimg.com/736x/79/af/6a/79af6a0030b12fc9c98711126e0c967b.jpg' },
+            { id: 'c10', name: 'Sam', url: 'https://i.pinimg.com/736x/e5/6c/81/e56c81223973fb5eca0553aa8e94d322.jpg' },
+            { id: 'c11', name: 'Finn', url: 'https://i.pinimg.com/736x/b0/4f/d2/b04fd2a83f8d6a86c363ef8c2cedd1b8.jpg' },
+            { id: 'c12', name: 'Benji', url: 'https://i.pinimg.com/736x/d0/c2/aa/d0c2aa78daf761a02dfcc6d431153b1b.jpg' },
+            { id: 'c13', name: 'Connor', url: 'https://i.pinimg.com/736x/b9/14/1b/b9141b224920baf23e6e18a28fec281e.jpg' },
+            { id: 'c14', name: 'Ellie', url: 'https://i.pinimg.com/736x/fc/7f/74/fc7f741c4f8d55ecbef60cfb1d9ae41c.jpg' },
+            { id: 'c15', name: 'Gabby', url: 'https://i.pinimg.com/736x/a9/02/f6/a902f64bb2fad9ea7c0ef3fb8378eefb.jpg' },
+            { id: 'c16', name: 'Miriam', url: 'https://i.pinimg.com/736x/20/32/bf/2032bf76dbdf63b46ae9700a0f110e96.jpg' },
+            { id: 'c17', name: 'Fiore', url: 'https://i.pinimg.com/736x/97/ed/43/97ed439990f0819b9441ea5503d36bf9.jpg' },
+            { id: 'c18', name: 'Ashley', url: 'https://i.pinimg.com/736x/f4/12/54/f41254f60d4c222cf59e1abbb4b0ae99.jpg' },
+            { id: 'c19', name: 'Tess', url: 'https://i.pinimg.com/736x/b4/0c/3a/b40c3ac96de25749753dee44ecb90196.jpg' },
+            { id: 'c20', name: 'Rosa Maria', url: 'https://i.pinimg.com/736x/43/26/f6/4326f60c5e78b7f88d54fdb7baa60881.jpg' },
+            { id: 'c21', name: 'Ally', url: 'https://i.pinimg.com/736x/ec/24/83/ec24830448fe0a21b25a7cf024e97298.jpg' },
+            { id: 'c22', name: 'Riya', url: 'https://i.pinimg.com/736x/a7/5c/06/a75c06e65abb45f19c2edabfedb93646.jpg' },
+            { id: 'c23', name: 'Anastasia', url: 'https://i.pinimg.com/736x/0d/7f/27/0d7f27b981d5924dea8f94d0c07aa583.jpg' },
+            { id: 'c24', name: 'Isabelle', url: 'https://i.pinimg.com/736x/5e/1a/f6/5e1af69ac6196b02e015133b3de84fd3.jpg' },
+            { id: 'c25', name: 'Ara', url: 'https://i.pinimg.com/736x/82/a4/d1/82a4d1b5a6a655d51588fa862b55b907.jpg' },
+            { id: 'c26', name: 'Dunia', url: 'https://i.pinimg.com/736x/14/80/4c/14804cea0cddd20025cc9ecc6bfaf3dc.jpg' },
+            { id: 'c27', name: 'Maggy', url: 'https://i.pinimg.com/736x/40/83/56/408356d6134bbf2c44d38884e7923d12.jpg' },
+            { id: 'c28', name: 'Robin', url: 'https://i.pinimg.com/736x/3f/11/0c/3f110cad03ab3735e538c20ff238697d.jpg' },
+            { id: 'c29', name: 'Superboy', url: 'https://i.pinimg.com/736x/5d/44/90/5d44907fb73b58a4a91134a9f25c0b2d.jpg' },
+            { id: 'c30', name: 'Zuko', url: 'https://i.pinimg.com/736x/86/b6/f3/86b6f3d6f859ea16d4e0d3d55e8bf3e4.jpg' },
+            { id: 'c31', name: 'Wario', url: 'https://i.pinimg.com/736x/07/72/16/07721681614a459938a7f85ec450f957.jpg' },
+            { id: 'c32', name: 'Marceline', url: 'https://i.pinimg.com/736x/b1/d9/be/b1d9bef151f48cc0585d578e31b79cce.jpg' },
+            { id: 'c33', name: 'Lapis', url: 'https://i.pinimg.com/1200x/09/fb/12/09fb12467957da96913fc8f75e6f6356.jpg' },
+            { id: 'c34', name: 'Mandy', url: 'https://i.pinimg.com/736x/70/49/ec/7049ec241db0be8cb0a9642d2b3351cd.jpg' },
+            { id: 'c35', name: 'Wanda', url: 'https://i.pinimg.com/736x/76/63/2c/76632cdd5765893ba8fbe9de12485dff.jpg' },
+            { id: 'c36', name: 'Gumball', url: 'https://i.pinimg.com/736x/af/61/0f/af610f55e819f4bd3f37e5001a2b19ee.jpg' },
+            { id: 'c37', name: 'Darwin', url: 'https://i.pinimg.com/1200x/5a/cf/9c/5acf9c886678411963046b04051e610e.jpg' },
+            { id: 'c38', name: 'Anais', url: 'https://i.pinimg.com/736x/68/6f/3c/686f3c8f998bf2d90e5e4c294e007788.jpg' },
+            { id: 'c39', name: 'Nicole', url: 'https://i.pinimg.com/736x/81/24/e4/8124e43da43da43e1d06dcdbca15f22a0cd9.jpg' },
+            { id: 'c40', name: 'Homer', url: 'https://i.pinimg.com/736x/f4/db/88/f4db8845d2dd534b3ff4a259edd2dce8.jpg' },
+            { id: 'c41', name: 'Lisa', url: 'https://i.pinimg.com/736x/81/68/de/8168de5a140ed669abfe5e2e4771b1b6.jpg' },
+            { id: 'c42', name: 'Bart', url: 'https://i.pinimg.com/1200x/03/11/09/031109591c66397c76e7489d42f3127d.jpg' },
+            { id: 'c43', name: 'Marge', url: 'https://i.pinimg.com/736x/77/6d/41/776d41748c4c9ae5940d8a9b10db881a.jpg' },
+            { id: 'c44', name: 'Stewie', url: 'https://i.pinimg.com/1200x/e2/41/eb/e241eb984821f9a67e6b61dbe68d3f5a.jpg' },
+            { id: 'c45', name: 'Woody', url: 'https://i.pinimg.com/736x/c6/cc/ca/c6ccca2d5a37919657b6eae0ccaba8fe.jpg' },
+            { id: 'c46', name: 'Buzz', url: 'https://i.pinimg.com/736x/30/c9/e0/30c9e0a90ae1e73676b7b210b74ae7a1.jpg' },
+            { id: 'c47', name: 'Shaggy', url: 'https://i.pinimg.com/736x/73/18/0e/73180e9d1b68bee40fa289746f8c06de.jpg' },
+            { id: 'c48', name: 'Doraemon', url: 'https://i.pinimg.com/736x/ef/43/fc/ef43fc1923e2904d1007b3b8b7a2e509.jpg' },
+            { id: 'c49', name: 'Aang', url: 'https://i.pinimg.com/736x/21/c6/02/21c60273e7409b871140d5cee2cace5b.jpg' },
+            { id: 'c50', name: 'Phineas', url: 'https://i.pinimg.com/736x/01/f8/d9/01f8d9e5651859eab697441a4e7d69c7.jpg' },
+            { id: 'c51', name: 'Dexter', url: 'https://i.pinimg.com/736x/aa/be/e8/aabee842ff1b687f75b531f7aff4a0c7.jpg' },
+            { id: 'c52', name: 'Jimmy', url: 'https://i.pinimg.com/736x/5e/5c/4b/5e5c4bd3018846ade0b0e5d989242b30.jpg' },
+            { id: 'c53', name: 'Yang', url: 'https://i.pinimg.com/736x/67/19/2c/67192c45308be09379c7841bf866a480.jpg' },
+            { id: 'c54', name: 'Yin', url: 'https://i.pinimg.com/736x/6b/a7/e1/6ba7e1445bcb8114acd249cba888672d.jpg' },
+            { id: 'c55', name: 'Spongebob', url: 'https://i.pinimg.com/736x/08/9d/56/089d562f45d59b2f7e37e643a5ebf927.jpg' },
+            { id: 'c56', name: 'Patrick', url: 'https://i.pinimg.com/736x/64/a3/f7/64a3f72a484c92329ba86e33263f2478.jpg' },
+            { id: 'c57', name: 'Sandy', url: 'https://i.pinimg.com/1200x/11/5b/0b/115b0b5b56f96879c6d0129a9f024373.jpg' },
+            { id: 'c58', name: 'Mr Krab', url: 'https://i.pinimg.com/736x/57/5f/6e/575f6e42df4f8a6af5f4e4eacc6c784b.jpg' },
+            { id: 'c59', name: 'Jake (Adv)', url: 'https://i.pinimg.com/736x/86/88/ca/8688ca028ab5ef10165f81f4323719e6.jpg' },
+            { id: 'c60', name: 'Leone', url: 'https://i.pinimg.com/736x/d1/f8/c5/d1f8c5a9ebd076378e70a04d3ea964c1.jpg' },
+            { id: 'c61', name: 'Scooby-doo', url: 'https://i.pinimg.com/736x/a4/99/05/a49905a3baa1eef7c233cf021e28ee58.jpg' },
+            { id: 'c62', name: 'Mordecai', url: 'https://i.pinimg.com/736x/4f/2e/04/4f2e04cace599c4433a84b490d12c2a4.jpg' },
+            { id: 'c63', name: 'Rigby', url: 'https://i.pinimg.com/736x/dd/7d/18/dd7d18fad1de3125ac14554e42f4d55f.jpg' },
+            { id: 'c64', name: 'Suicune', url: 'https://i.pinimg.com/1200x/ac/46/16/ac46168c080901af74decf8b6fe3464c.jpg' },
+            { id: 'c65', name: 'Pikachu', url: 'https://i.pinimg.com/1200x/b9/42/36/b94236cb2fb6fd4def12d4ebb744fc8f.jpg' },
+            { id: 'c66', name: 'Zenitsu', url: 'https://i.pinimg.com/736x/bb/23/08/bb230890228c2ffdff474019faf8c4dd.jpg' },
+            { id: 'c67', name: 'Sonic', url: 'https://i.pinimg.com/736x/00/c1/6a/00c16a1e431630f5f09ef2f81a50a399.jpg' },
+            { id: 'c68', name: 'Ben 10', url: 'https://i.pinimg.com/736x/be/90/52/be9052475920b10fc6261b3aae2487a7.jpg' },
+            { id: 'c69', name: 'Raven', url: 'https://i.pinimg.com/736x/fc/e3/30/fce330b50ce9cbf53287e441be15d597.jpg' },
+            { id: 'c70', name: 'Johnny Bravo', url: 'https://i.pinimg.com/736x/fe/40/3f/fe403f42663b80a6e01d96ef8cbe7a76.jpg' },
+            { id: 'c71', name: 'Elsa', url: 'https://i.pinimg.com/736x/d8/19/10/d819101157f153a19e84aa5ee0a72b9f.jpg' },
+            { id: 'c72', name: 'Ade', url: 'https://i.pinimg.com/736x/e7/29/0c/e7290c161c9517ba4038274d1aa8a6cf.jpg' }
         ];
 
-        let currentUser = null;
-        let myNickname = "";
+        const MINIGAMES = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence'];
+
+        // ==========================================
+        // AUDIO ENGINE (Sintetizzatore nativo)
+        // ==========================================
+        const audioEngine = {
+            ctx: null,
+            init() {
+                if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                if(this.ctx.state === 'suspended') this.ctx.resume();
+            },
+            play(type, freq, duration, vol=0.1) {
+                if(!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            },
+            playCorrect(step) { const freqs = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88]; this.play('sine', freqs[step] || 523.25, 0.3); },
+            playWrong() { this.play('sawtooth', 150, 0.5, 0.2); },
+            playWin() { this.playCorrect(0); setTimeout(()=>this.playCorrect(2), 100); setTimeout(()=>this.playCorrect(4), 200); },
+            playTick() { this.play('square', 800, 0.05, 0.05); },
+            playExplosion() { this.play('sawtooth', 50, 1.5, 0.4); }
+        };
+
+        // ==========================================
+        // FIREBASE SETUP (STRICT RULES APPLIED)
+        // ==========================================
+        let app, auth, db, user;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'elimination-party-v1';
+        
+        try {
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { /* Fallback conf for local test removed */ };
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) {
+            console.error("Firebase init error (expected in isolated preview without config):", e);
+            // Fallback gracefully per l'ambiente di anteprima
+            document.getElementById('screen-menu').innerHTML = `<div class="p-8 text-center text-red-500 bg-slate-800 rounded">Errore Inizializzazione Firebase. L'app richiede l'ambiente corretto con __firebase_config.</div>`;
+        }
+
+        let unsubscribeRoom = null;
         let currentRoomId = null;
         let isHost = false;
-        let unsubRoom = null;
-        let roomData = null;
-        
-        // Cache DOM
-        const appDiv = document.getElementById('app');
-        const headerRoom = document.getElementById('header-room');
-        const headerUser = document.getElementById('header-user');
-        const headerPhase = document.getElementById('header-phase');
-        const views = document.querySelectorAll('.view-section');
-
-        // Utils
-        const showToast = (msg) => {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-            toast.innerText = msg;
-            container.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
-        };
-        const switchView = (viewId) => {
-            views.forEach(v => v.classList.add('hidden'));
-            document.getElementById(viewId).classList.remove('hidden');
-        };
-        const getPlayerPath = () => collection(db, 'artifacts', appId, 'public', 'data', 'rooms');
-        const randomID = () => Math.random().toString(36).substring(2, 8).toUpperCase();
-        const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-        const delay = ms => new Promise(res => setTimeout(res, ms));
+        let localState = {}; // Mantiene una copia dello stato
+        let npcLogicIntervals = []; // Per pulire i timeout degli NPC
 
         // ==========================================
-        // INIT & AUTH
+        // UI & UTILS
         // ==========================================
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                appDiv.classList.remove('hidden');
-                switchView('view-menu');
+        const ui = {
+            screens: ['menu', 'create', 'join', 'lobby', 'game', 'stats'],
+            showScreen(id) {
+                this.screens.forEach(s => document.getElementById(`screen-${s}`).classList.add('hidden'));
+                document.getElementById(`screen-${id}`).classList.remove('hidden');
+                if(id === 'lobby') ui.renderCharacterGrid();
+            },
+            notify(msg, type = 'info') {
+                const container = document.getElementById('notification-container');
+                const el = document.createElement('div');
+                el.className = `notification ${type === 'error' ? 'border-red-500' : 'border-blue-500'}`;
+                el.innerText = msg;
+                container.appendChild(el);
+                setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3000);
+            },
+            getChar(id) { return CHARACTERS.find(c => c.id === id); },
+            generateId() { return Math.random().toString(36).substring(2, 8).toUpperCase(); },
+            shuffle(array) {
+                let currentIndex = array.length,  randomIndex;
+                while (currentIndex > 0) {
+                    randomIndex = Math.floor(Math.random() * currentIndex);
+                    currentIndex--;
+                    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+                }
+                return array;
             }
-        });
-        signInAnonymously(auth).catch(e => showToast("Errore Auth: " + e.message));
+        };
+
+        window.ui = ui; // Expose for HTML inline handlers
 
         // ==========================================
-        // MENU LOGIC
+        // CORE LOGIC & FIREBASE SYNC
         // ==========================================
-        document.getElementById('btn-create-room').onclick = async () => {
-            myNickname = document.getElementById('nickname-input').value.trim();
-            if (!myNickname) return showToast("Inserisci un nickname!");
-            currentRoomId = randomID();
-            isHost = true;
-            headerUser.innerText = myNickname;
-            headerRoom.innerText = `Stanza: ${currentRoomId}`;
+        const logic = {
+            async initAuth() {
+                if(auth && !user) {
+                    onAuthStateChanged(auth, (u) => { 
+                        if(u) user = u; 
+                    });
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                }
+            },
             
-            // Create default room state
-            const roomRef = doc(getPlayerPath(), currentRoomId);
-            await setDoc(roomRef, {
-                status: 'config',
-                hostId: currentUser.uid,
-                maxPlayers: 14,
-                returnees: 0,
-                players: {
-                    [currentUser.uid]: {
-                        id: currentUser.uid, name: myNickname, isBot: false, charId: null,
-                        isEliminated: false, rank: null
+            getRoomsRef() { return collection(db, 'artifacts', appId, 'public', 'data', 'rooms'); },
+            getRoomDoc(id) { return doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id); },
+
+            updateNPCCount() {
+                const total = parseInt(document.getElementById('input-total-players').value) || 15;
+                const humans = parseInt(document.getElementById('input-human-players').value) || 5;
+                let bots = total - humans;
+                if(bots < 0) bots = 0;
+                document.getElementById('display-npc-count').innerText = bots;
+            },
+
+            async createRoom() {
+                audioEngine.init(); // Sblocca audio
+                const nickname = document.getElementById('input-nickname').value.trim() || 'Host';
+                if(!user) await logic.initAuth();
+                
+                currentRoomId = ui.generateId();
+                isHost = true;
+                
+                const totalPlayers = parseInt(document.getElementById('input-total-players').value);
+                const humanLimit = parseInt(document.getElementById('input-human-players').value);
+                
+                const initialData = {
+                    id: currentRoomId,
+                    status: 'character_select',
+                    hostId: user.uid,
+                    settings: { totalPlayers, humanLimit },
+                    players: [{
+                        uid: user.uid,
+                        name: nickname,
+                        isNpc: false,
+                        charId: null,
+                        isReady: false,
+                        isAlive: true,
+                        stats: { minigames: 0, wins: 0, livesLost: 0, order: 0 }
+                    }],
+                    gameState: {
+                        round: 0,
+                        phase: 'waiting', // waiting, selecting, playing, resolving
+                        selectedPlayers: [],
+                        currentMinigame: null,
+                        minigameState: {},
+                        eliminatedThisRound: []
+                    },
+                    messages: []
+                };
+
+                try {
+                    await setDoc(logic.getRoomDoc(currentRoomId), initialData);
+                    logic.listenToRoom();
+                    ui.showScreen('lobby');
+                } catch(e) {
+                    ui.notify("Errore creazione stanza.", "error");
+                    console.error(e);
+                }
+            },
+
+            async joinRoom() {
+                audioEngine.init(); // Sblocca audio
+                const nickname = document.getElementById('input-nickname').value.trim() || 'Player';
+                const code = document.getElementById('input-room-code').value.trim().toUpperCase();
+                if(code.length !== 6) return ui.notify("Codice non valido", "error");
+                
+                if(!user) await logic.initAuth();
+                
+                const roomDoc = logic.getRoomDoc(code);
+                try {
+                    const snap = await getDoc(roomDoc);
+                    if(!snap.exists()) return ui.notify("Stanza inesistente", "error");
+                    
+                    const data = snap.data();
+                    if(data.status !== 'character_select') return ui.notify("Partita già in corso", "error");
+                    
+                    const humans = data.players.filter(p => !p.isNpc).length;
+                    if(humans >= data.settings.humanLimit) return ui.notify("Stanza piena", "error");
+                    
+                    if(data.players.some(p => p.uid === user.uid)) {
+                        // Già dentro
+                    } else {
+                        const updatedPlayers = [...data.players, {
+                            uid: user.uid,
+                            name: nickname,
+                            isNpc: false,
+                            charId: null,
+                            isReady: false,
+                            isAlive: true,
+                            stats: { minigames: 0, wins: 0, livesLost: 0, order: 0 }
+                        }];
+                        await updateDoc(roomDoc, { players: updatedPlayers });
+                    }
+                    
+                    currentRoomId = code;
+                    isHost = false;
+                    logic.listenToRoom();
+                    ui.showScreen('lobby');
+                    
+                } catch(e) {
+                    ui.notify("Errore di connessione.", "error");
+                    console.error(e);
+                }
+            },
+
+            listenToRoom() {
+                if(unsubscribeRoom) unsubscribeRoom();
+                unsubscribeRoom = onSnapshot(logic.getRoomDoc(currentRoomId), (doc) => {
+                    if(!doc.exists()) {
+                        ui.notify("La stanza è stata chiusa.");
+                        location.reload();
+                        return;
+                    }
+                    const data = doc.data();
+                    const oldData = localState ? JSON.parse(JSON.stringify(localState)) : {};
+                    localState = data;
+                    
+                    // Host DJ UI
+                    if (isHost && (data.status === 'character_select' || data.status === 'playing')) {
+                        document.getElementById('dj-booth').classList.remove('hidden');
+                    } else {
+                        document.getElementById('dj-booth').classList.add('hidden');
+                    }
+
+                    // Music Sync
+                    if (data.musicId !== oldData.musicId) {
+                        const container = document.getElementById('youtube-player-container');
+                        if (data.musicId) {
+                            // YouTube iframe invisibile con autoplay e loop
+                            container.innerHTML = `<iframe width="0" height="0" src="https://www.youtube.com/embed/${data.musicId}?autoplay=1&loop=1&playlist=${data.musicId}" allow="autoplay"></iframe>`;
+                            if(oldData.musicId !== undefined) ui.notify("🎵 Nuova colonna sonora in riproduzione!", "info");
+                        } else {
+                            container.innerHTML = ''; // Ferma la musica
+                        }
+                    }
+                    
+                    // Render UI based on state
+                    if(data.status === 'character_select') logic.renderLobby();
+                    if(data.status === 'playing') {
+                        if(document.getElementById('screen-game').classList.contains('hidden')) ui.showScreen('game');
+                        logic.renderGame();
+                    }
+                    if(data.status === 'finished') logic.renderStats();
+
+                    // Host NPC Engine Tick
+                    if(isHost && data.status === 'playing') {
+                        npcEngine.tick(localState, JSON.parse(oldState || "{}"));
+                    }
+                }, (err) => {
+                    console.error("Snapshot error:", err);
+                    ui.notify("Disconnesso dalla stanza.", "error");
+                });
+            },
+
+            // --- LOBBY LOGIC ---
+            async selectCharacter(charId) {
+                if(!user || !localState || localState.status !== 'character_select') return;
+                
+                // Check if taken
+                if(localState.players.some(p => p.charId === charId)) return;
+
+                const updatedPlayers = localState.players.map(p => {
+                    if(p.uid === user.uid) return { ...p, charId: charId };
+                    return p;
+                });
+                await updateDoc(logic.getRoomDoc(currentRoomId), { players: updatedPlayers });
+            },
+
+            async toggleReady() {
+                audioEngine.init(); // Sblocca audio
+                if(!user || !localState) return;
+                const me = localState.players.find(p => p.uid === user.uid);
+                if(!me || !me.charId) return ui.notify("Scegli un personaggio prima!");
+                
+                const updatedPlayers = localState.players.map(p => {
+                    if(p.uid === user.uid) return { ...p, isReady: !p.isReady };
+                    return p;
+                });
+                await updateDoc(logic.getRoomDoc(currentRoomId), { players: updatedPlayers });
+            },
+
+            renderLobby() {
+                document.getElementById('lobby-room-code').innerText = currentRoomId;
+                const humans = localState.players.filter(p => !p.isNpc);
+                document.getElementById('lobby-player-count').innerText = `${humans.length}/${localState.settings.humanLimit}`;
+                
+                const me = localState.players.find(p => p.uid === user?.uid);
+                const btnReady = document.getElementById('btn-ready');
+                const btnStart = document.getElementById('btn-start-game');
+                
+                if(me) {
+                    btnReady.classList.remove('hidden');
+                    btnReady.innerText = me.isReady ? "NON PRONTO" : "PRONTO";
+                    btnReady.className = me.isReady 
+                        ? "bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-6 rounded-lg" 
+                        : "bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg animate-pulse";
+                }
+
+                const allHumansReady = humans.length > 0 && humans.every(p => p.isReady && p.charId);
+                
+                if(isHost) {
+                    btnStart.classList.remove('hidden');
+                    btnStart.disabled = !allHumansReady;
+                    btnStart.className = allHumansReady 
+                        ? "bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg animate-pulse-glow cursor-pointer" 
+                        : "bg-slate-600 text-slate-400 font-bold py-2 px-6 rounded-lg cursor-not-allowed";
+                    
+                    document.getElementById('lobby-status').innerText = allHumansReady ? "Tutti pronti! Puoi avviare." : "In attesa che tutti siano pronti...";
+                } else {
+                    document.getElementById('lobby-status').innerText = allHumansReady ? "In attesa dell'Host..." : "In attesa degli altri giocatori...";
+                }
+
+                // Aggiorna griglia
+                const charsGrid = document.getElementById('character-grid');
+                if(charsGrid.children.length === 0) ui.renderCharacterGrid(); // Prima renderizzazione
+                
+                Array.from(charsGrid.children).forEach(card => {
+                    const charId = card.dataset.id;
+                    const owner = localState.players.find(p => p.charId === charId);
+                    
+                    card.classList.remove('selected', 'taken');
+                    const badge = card.querySelector('.badge');
+                    if(badge) badge.remove();
+
+                    if(owner) {
+                        if(owner.uid === user.uid) {
+                            card.classList.add('selected');
+                        } else {
+                            card.classList.add('taken');
+                            const b = document.createElement('div');
+                            b.className = "badge absolute -top-2 -right-2 bg-red-500 text-xs px-2 py-1 rounded-full z-10";
+                            b.innerText = owner.name.substring(0,5);
+                            card.appendChild(b);
+                        }
+                    }
+                });
+
+                // Lista giocatori
+                const list = document.getElementById('lobby-players-list');
+                list.innerHTML = humans.map(p => `
+                    <div class="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-full text-sm border ${p.isReady ? 'border-green-500' : 'border-slate-600'}">
+                        ${p.charId ? `<img src="${ui.getChar(p.charId).url}" class="w-6 h-6 rounded-full object-cover">` : '<div class="w-6 h-6 rounded-full bg-slate-600"></div>'}
+                        <span class="${p.isReady ? 'text-green-400' : 'text-slate-400'}">${p.name}</span>
+                    </div>
+                `).join('');
+            },
+
+            async startGame() {
+                if(!isHost) return;
+                
+                // 1. Genera NPC
+                let players = [...localState.players];
+                const npcCount = localState.settings.totalPlayers - players.length;
+                
+                const usedChars = players.map(p => p.charId).filter(id => id);
+                let availableChars = CHARACTERS.filter(c => !usedChars.includes(c.id));
+                availableChars = ui.shuffle(availableChars);
+
+                for(let i=0; i<npcCount; i++) {
+                    const char = availableChars.pop();
+                    players.push({
+                        uid: `npc_${ui.generateId()}`,
+                        name: char.name, // Nome bot = nome personaggio
+                        isNpc: true,
+                        charId: char.id,
+                        isReady: true,
+                        isAlive: true,
+                        stats: { minigames: 0, wins: 0, livesLost: 0, order: 0 }
+                    });
+                }
+
+                await updateDoc(logic.getRoomDoc(currentRoomId), {
+                    status: 'playing',
+                    players: players,
+                    'gameState.phase': 'init_round'
+                });
+
+                // L'Host fa partire il primo round dopo 2 secondi di "Preparazione"
+                setTimeout(() => {
+                    hostEngine.startRound();
+                }, 2000);
+            },
+
+            // --- GAME LOOP (Solo per renderizzazione UI. Host logica è sotto) ---
+            renderGame() {
+                const gs = localState.gameState;
+                document.getElementById('game-round-number').innerText = gs.round;
+                const alive = localState.players.filter(p => p.isAlive);
+                document.getElementById('game-alive-count').innerText = alive.length;
+                document.getElementById('game-challenge-type').innerText = alive.length >= 12 ? '3' : '2';
+
+                // Sidebar
+                document.getElementById('game-alive-list').innerHTML = alive.map(p => `
+                    <div class="flex items-center gap-2 p-1 ${gs.selectedPlayers.includes(p.uid) ? 'bg-blue-900/50 border border-blue-500 rounded' : ''}">
+                        <img src="${ui.getChar(p.charId).url}" class="w-8 h-8 rounded object-cover border border-slate-700">
+                        <span class="text-sm truncate ${p.uid === user.uid ? 'text-yellow-400 font-bold' : ''}">${p.name}</span>
+                    </div>
+                `).join('');
+
+                // Sidebar Eliminati
+                const dead = localState.players.filter(p => !p.isAlive).sort((a,b) => b.stats.order - a.stats.order);
+                const deadListEl = document.getElementById('game-dead-list');
+                if(deadListEl) {
+                    deadListEl.innerHTML = dead.map(p => `
+                        <div class="flex items-center gap-2 p-1 opacity-60 grayscale">
+                            <img src="${ui.getChar(p.charId).url}" class="w-6 h-6 rounded object-cover border border-red-900">
+                            <span class="text-xs truncate text-red-400 line-through">${p.name}</span>
+                        </div>
+                    `).join('');
+                }
+
+                // Chat
+                const chatEl = document.getElementById('game-chat-messages');
+                if(chatEl && localState.messages) {
+                    chatEl.innerHTML = localState.messages.map(m => `
+                        <div class="bg-black/20 rounded p-2 border border-white/5">
+                            <span class="font-bold text-[10px] text-${m.uid === user.uid ? 'blue' : 'yellow'}-400 uppercase">${m.name}:</span>
+                            <span class="text-xs ml-1 text-slate-200 break-words">${m.text}</span>
+                        </div>
+                    `).join('');
+                    chatEl.scrollTop = chatEl.scrollHeight;
+                }
+
+                // Phase logic
+                const phaseInd = document.getElementById('game-phase-indicator');
+                const susp = document.getElementById('suspense-container');
+                const mini = document.getElementById('minigame-container');
+                const res = document.getElementById('round-result-container');
+                
+                if(gs.phase === 'init_round') {
+                    window.currentSuspenseIds = null;
+                    phaseInd.innerText = "Preparazione...";
+                    susp.classList.add('hidden'); mini.classList.add('hidden'); res.classList.add('hidden');
+                } 
+                else if(gs.phase === 'selecting') {
+                    phaseInd.innerText = "Selezione in corso...";
+                    susp.classList.remove('hidden'); mini.classList.add('hidden'); res.classList.add('hidden');
+                    this.renderSuspense(gs.selectedPlayers);
+                }
+                else if(gs.phase === 'playing') {
+                    window.currentSuspenseIds = null;
+                    phaseInd.innerText = `Sfida: ${gs.currentMinigame.toUpperCase()}`;
+                    susp.classList.add('hidden'); mini.classList.remove('hidden'); res.classList.add('hidden');
+                    minigamesEngine.render(gs.currentMinigame, gs.minigameState, gs.selectedPlayers);
+                }
+                else if(gs.phase === 'resolving') {
+                    window.currentSuspenseIds = null;
+                    phaseInd.innerText = "Eliminazione";
+                    susp.classList.add('hidden'); mini.classList.add('hidden'); res.classList.remove('hidden');
+                    
+                    const elList = document.getElementById('eliminated-players');
+                    elList.innerHTML = gs.eliminatedThisRound.map(uid => {
+                        const p = localState.players.find(x => x.uid === uid);
+                        return `
+                            <div class="flex flex-col items-center p-4 bg-red-950/80 rounded-xl border border-red-500 shadow-xl scale-110">
+                                <img src="${ui.getChar(p.charId).url}" class="w-24 h-24 rounded object-cover mb-2 grayscale">
+                                <span class="font-bold text-xl">${p.name}</span>
+                                <span class="text-sm text-red-300">ELIMINATO</span>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    const btn = document.getElementById('btn-next-round');
+                    if(isHost) {
+                        btn.classList.remove('hidden');
+                        btn.onclick = () => hostEngine.startRound();
+                        if(alive.length <= 1) btn.innerText = "Vedi Classifica Finale";
+                    } else {
+                        btn.classList.add('hidden');
+                    }
+                }
+            },
+
+            renderSuspense(selectedIds) {
+                // Evita di far ripartire l'animazione se ci troviamo già nello stesso round
+                if (window.currentSuspenseIds === selectedIds.join(',')) return;
+                window.currentSuspenseIds = selectedIds.join(',');
+
+                const container = document.getElementById('suspense-slots');
+                const alivePlayers = localState.players.filter(p => p.isAlive);
+                
+                // Crea la griglia con tutti i giocatori vivi
+                container.innerHTML = `
+                    <div class="flex flex-col items-center w-full max-w-5xl">
+                        <h3 id="suspense-subtitle" class="text-2xl text-yellow-400 mb-6 font-bold animate-pulse">La roulette sta scegliendo...</h3>
+                        <div class="flex flex-wrap justify-center gap-3 md:gap-4 max-h-[60vh] overflow-y-auto p-4 w-full">
+                            ${alivePlayers.map(p => `
+                                <div id="susp-card-${p.uid}" class="relative flex flex-col items-center bg-slate-800 p-2 rounded-xl shadow-lg border-2 border-transparent w-20 md:w-28 opacity-50 grayscale transition-all duration-100">
+                                    <img src="${ui.getChar(p.charId).url}" class="w-14 h-14 md:w-20 md:h-20 rounded-lg object-cover mb-1">
+                                    <span class="text-[10px] md:text-xs font-bold text-white w-full text-center overflow-hidden text-ellipsis whitespace-nowrap">${p.name}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                if (window.rouletteInterval) clearInterval(window.rouletteInterval);
+                
+                const duration = 5000; // Durata aumentata per meno caos
+                const intervalTime = 300; // Selezione più lenta
+                let elapsed = 0;
+                
+                window.rouletteInterval = setInterval(() => {
+                    elapsed += intervalTime;
+                    
+                    // Resetta tutti i giocatori allo stato spento/grigio
+                    alivePlayers.forEach(p => {
+                        const el = document.getElementById(`susp-card-${p.uid}`);
+                        if(el) el.className = "relative flex flex-col items-center bg-slate-800 p-2 rounded-xl shadow-lg border-2 border-transparent w-20 md:w-28 opacity-50 grayscale transition-all duration-100";
+                    });
+
+                    if (elapsed >= duration) {
+                        // Animazione finita: Evidenzia i veri sfidanti
+                        clearInterval(window.rouletteInterval);
+                        selectedIds.forEach(uid => {
+                            const el = document.getElementById(`susp-card-${uid}`);
+                            if(el) {
+                                el.className = "relative flex flex-col items-center bg-red-950 p-2 rounded-xl shadow-[0_0_20px_#ef4444] border-2 border-red-500 w-20 md:w-28 opacity-100 grayscale-0 scale-125 z-20 animate-pulse";
+                                el.innerHTML += `<div class="absolute -top-3 -right-3 bg-red-600 text-white text-[10px] font-black px-2 py-1 rounded shadow-lg transform rotate-12 uppercase tracking-wider">A Rischio</div>`;
+                            }
+                        });
+                        const subtitle = document.getElementById('suspense-subtitle');
+                        if (subtitle) {
+                            subtitle.innerText = "Sfidanti selezionati!";
+                            subtitle.className = "text-3xl text-red-500 mb-6 font-black drop-shadow-lg scale-110 transition-transform";
+                        }
+                    } else {
+                        // Seleziona casualmente dei giocatori per l'effetto lampeggiante
+                        const randomPicks = ui.shuffle([...alivePlayers]).slice(0, selectedIds.length);
+                        
+                        randomPicks.forEach(p => {
+                            const el = document.getElementById(`susp-card-${p.uid}`);
+                            if(el) {
+                                el.className = "relative flex flex-col items-center bg-slate-700 p-2 rounded-xl shadow-[0_0_15px_#fbbf24] border-2 border-yellow-400 w-20 md:w-28 opacity-100 grayscale-0 scale-110 z-10 transition-all duration-100";
+                            }
+                        });
+                    }
+                }, intervalTime);
+            },
+
+            renderStats() {
+                ui.showScreen('stats');
+                const players = [...localState.players].sort((a, b) => b.stats.order - a.stats.order); // Ordina per eliminazione (più alto = durato di più)
+                
+                const winner = players[0];
+                document.getElementById('winner-display').innerHTML = `
+                    <img src="${ui.getChar(winner.charId).url}" class="w-48 h-48 rounded-2xl object-cover border-8 border-yellow-400 shadow-[0_0_30px_rgba(250,204,21,0.8)] mb-4">
+                    <h2 class="text-4xl font-bold text-white">${winner.name}</h2>
+                    <p class="text-yellow-400">Ultimo sopravvissuto</p>
+                `;
+
+                const tbody = document.getElementById('stats-table-body');
+                tbody.innerHTML = players.map((p, i) => `
+                    <tr class="border-b border-slate-800 hover:bg-slate-800/50">
+                        <td class="p-3 font-bold ${i===0 ? 'text-yellow-400' : 'text-slate-400'}">${i+1}°</td>
+                        <td class="p-3 flex items-center gap-3">
+                            <img src="${ui.getChar(p.charId).url}" class="w-8 h-8 rounded-full object-cover">
+                            <span class="${p.uid === user.uid ? 'text-blue-400 font-bold' : ''}">${p.name} ${p.isNpc ? '<span class="text-xs bg-slate-700 px-1 rounded ml-1">BOT</span>' : ''}</span>
+                        </td>
+                        <td class="p-3 text-center">${p.stats.minigames}</td>
+                        <td class="p-3 text-center text-green-400 font-bold">${p.stats.wins}</td>
+                        <td class="p-3 text-center text-red-400">${p.stats.livesLost}</td>
+                    </tr>
+                `).join('');
+            }
+        };
+        window.logic = logic;
+
+        // UI Helpers
+        ui.renderCharacterGrid = () => {
+            const grid = document.getElementById('character-grid');
+            grid.innerHTML = CHARACTERS.map(c => `
+                <div class="char-card bg-slate-700 rounded-lg p-2 relative flex flex-col items-center" data-id="${c.id}" onclick="logic.selectCharacter('${c.id}')">
+                    <img src="${c.url}" class="w-full h-20 object-cover rounded mb-1" loading="lazy">
+                    <span class="text-xs text-center font-bold truncate w-full" title="${c.name}">${c.name}</span>
+                </div>
+            `).join('');
+        };
+
+
+        // ==========================================
+        // HOST ENGINE (Logica di Gioco Autoritaria)
+        // ==========================================
+        const hostEngine = {
+            async startRound() {
+                if(!isHost) return;
+                
+                const alive = localState.players.filter(p => p.isAlive);
+                
+                // Condizione Finale
+                if(alive.length <= 1) {
+                    await this.finishGame(alive[0]?.uid);
+                    return;
+                }
+
+                let numToSelect = alive.length >= 12 ? 3 : 2;
+                
+                // Shuffle e seleziona
+                const shuffledAlive = ui.shuffle([...alive]);
+                const selected = shuffledAlive.slice(0, numToSelect).map(p => p.uid);
+
+                // Update Stats (selezionati)
+                let updatedPlayers = [...localState.players];
+                selected.forEach(uid => {
+                    let p = updatedPlayers.find(x => x.uid === uid);
+                    p.stats.minigames++;
+                });
+
+                // Setta fase suspense
+                await updateDoc(logic.getRoomDoc(currentRoomId), {
+                    'gameState.round': localState.gameState.round + 1,
+                    'gameState.phase': 'selecting',
+                    'gameState.selectedPlayers': selected,
+                    players: updatedPlayers
+                });
+
+                // Suspense Timeout
+                setTimeout(() => {
+                    this.initMinigame(selected, alive.length === 2);
+                }, 6500); // Sincronizzato con i 5 secondi di roulette + 1.5s di pausa
+            },
+
+            async initMinigame(selectedIds, isFinal) {
+                // Scegli gioco casuale compatibile col numero di giocatori
+                let availableGames = MINIGAMES;
+                if(selectedIds.length === 3) {
+                    availableGames = ['tiles', 'memory', 'dice', 'voting', 'maze', 'reaction', 'mash', 'wheel'];
+                }
+                
+                const gameName = availableGames[Math.floor(Math.random() * availableGames.length)];
+                
+                // Init stato specifico del gioco
+                const minigameState = minigamesEngine.hostInit(gameName, selectedIds);
+                
+                await updateDoc(logic.getRoomDoc(currentRoomId), {
+                    'gameState.phase': 'playing',
+                    'gameState.currentMinigame': gameName,
+                    'gameState.minigameState': minigameState
+                });
+            },
+
+            async resolveGame(loserIds) {
+                // loserIds è un array.
+                let updatedPlayers = [...localState.players];
+                let eliminations = [];
+                let aliveCount = updatedPlayers.filter(p => p.isAlive).length;
+
+                loserIds.forEach(uid => {
+                    let p = updatedPlayers.find(x => x.uid === uid);
+                    p.isAlive = false;
+                    p.stats.order = aliveCount; // L'ordine di eliminazione è basato su quanti erano vivi (più alto = migliore)
+                    aliveCount--;
+                    eliminations.push(uid);
+                });
+
+                // Update win stats per chi era selezionato ma non ha perso
+                localState.gameState.selectedPlayers.forEach(uid => {
+                    if(!loserIds.includes(uid)) {
+                        let p = updatedPlayers.find(x => x.uid === uid);
+                        p.stats.wins++;
+                    }
+                });
+
+                await updateDoc(logic.getRoomDoc(currentRoomId), {
+                    'gameState.phase': 'resolving',
+                    'gameState.eliminatedThisRound': eliminations,
+                    players: updatedPlayers
+                });
+            },
+
+            async finishGame(winnerId) {
+                if(winnerId) {
+                    let updatedPlayers = [...localState.players];
+                    let w = updatedPlayers.find(x => x.uid === winnerId);
+                    if(w) w.stats.order = 999; // Vincitore assoluto
+                    await updateDoc(logic.getRoomDoc(currentRoomId), {
+                        status: 'finished',
+                        players: updatedPlayers
+                    });
+                }
+            }
+        };
+
+        // ==========================================
+        // MINIGAMES ENGINE (Render & Logica Condivisa)
+        // ==========================================
+        const minigamesEngine = {
+            games: {
+                tiles: {
+                    title: "Tiles Fortunata",
+                    desc: "Evita le bombe! Fai a turno per cliccare una tile.",
+                    init(pIds) {
+                        const size = pIds.length === 3 ? 49 : 36;
+                        const numBombs = pIds.length === 3 ? 8 : 5;
+                        let tiles = Array(size).fill({ type: 'safe', revealed: false });
+                        for(let i=0; i<numBombs; i++) tiles[i] = { type: 'bomb', revealed: false };
+                        tiles = ui.shuffle(tiles);
+                        
+                        let players = {};
+                        pIds.forEach(id => players[id] = { lives: 3 });
+                        
+                        return { tiles, players, turnIndex: 0 };
+                    },
+                    render(state, pIds) {
+                        const area = document.getElementById('minigame-render-area');
+                        const isMyTurn = pIds[state.turnIndex] === user.uid;
+                        const turnUid = pIds[state.turnIndex];
+                        const turnPlayer = localState.players.find(p => p.uid === turnUid);
+                        
+                        document.getElementById('minigame-desc').innerHTML = `Turno di: <strong class="${isMyTurn ? 'text-green-400' : 'text-blue-400'}">${turnPlayer.name}</strong>`;
+                        
+                        // HUD Vite
+                        this.renderHUD(state.players, pIds, isMyTurn ? turnUid : null);
+
+                        // Grid
+                        const cols = pIds.length === 3 ? 7 : 6;
+                        area.innerHTML = `<div class="game-grid" style="grid-template-columns: repeat(${cols}, 50px);">
+                            ${state.tiles.map((t, i) => `
+                                <div class="tile w-[50px] h-[50px] ${t.revealed ? (t.type === 'bomb' ? 'bomb revealed' : 'safe revealed') : ''}" 
+                                     onclick="if(${isMyTurn} && !${t.revealed}) actions.tiles_click(${i})">
+                                     ${t.revealed && t.type === 'bomb' ? '💣' : ''}
+                                </div>
+                            `).join('')}
+                        </div>`;
+                    },
+                    npcTurn(state, pIds, currentUid) {
+                        // Scegli una tile non rivelata a caso
+                        const unrevealed = state.tiles.map((t,i) => t.revealed ? null : i).filter(i => i !== null);
+                        if(unrevealed.length > 0) {
+                            const choice = unrevealed[Math.floor(Math.random() * unrevealed.length)];
+                            actions.tiles_click(choice, currentUid);
+                        }
                     }
                 },
-                relationships: {},
-                engagements: {},
-                currentRound: 1,
-                phaseData: {},
-                ranking: []
-            });
-            listenToRoom();
-            switchView('view-config');
-        };
-
-        document.getElementById('btn-join-room-modal').onclick = () => {
-            document.getElementById('join-area').classList.remove('hidden');
-        };
-
-        document.getElementById('btn-join-room').onclick = async () => {
-            myNickname = document.getElementById('nickname-input').value.trim();
-            const code = document.getElementById('room-code-input').value.trim().toUpperCase();
-            if (!myNickname || !code) return showToast("Inserisci Nickname e Codice!");
-            
-            const roomRef = doc(getPlayerPath(), code);
-            const rSnap = await getDoc(roomRef);
-            if (!rSnap.exists()) return showToast("Stanza non trovata!");
-            const rData = rSnap.data();
-            if (rData.status !== 'lobby' && rData.status !== 'config') return showToast("Partita già iniziata!");
-            if (Object.keys(rData.players).length >= rData.maxPlayers) return showToast("Stanza piena!");
-
-            currentRoomId = code;
-            isHost = false;
-            headerUser.innerText = myNickname;
-            headerRoom.innerText = `Stanza: ${currentRoomId}`;
-            
-            await updateDoc(roomRef, {
-                [`players.${currentUser.uid}`]: {
-                    id: currentUser.uid, name: myNickname, isBot: false, charId: null,
-                    isEliminated: false, rank: null
-                }
-            });
-            listenToRoom();
-        };
-
-        // ==========================================
-        // HOST CONFIG LOGIC
-        // ==========================================
-        document.getElementById('btn-save-config').onclick = async () => {
-            const maxP = parseInt(document.getElementById('config-players').value);
-            const ret = parseInt(document.getElementById('config-returnees').value);
-            await updateDoc(doc(getPlayerPath(), currentRoomId), {
-                maxPlayers: maxP,
-                returnees: ret,
-                status: 'lobby'
-            });
-        };
-
-        // ==========================================
-        // ROOM LISTENER (CORE ENGINE)
-        // ==========================================
-        function listenToRoom() {
-            if (unsubRoom) unsubRoom();
-            unsubRoom = onSnapshot(doc(getPlayerPath(), currentRoomId), async (snap) => {
-                if (!snap.exists()) return showToast("Stanza chiusa.");
-                const oldData = roomData;
-                roomData = snap.data();
                 
-                // Update UI based on Status
-                headerPhase.innerText = roomData.status.toUpperCase();
-                
-                if (roomData.status === 'lobby') renderLobby();
-                if (roomData.status === 'social') {
-                    if(oldData?.status !== 'social') { initSocialPhaseUI(); }
-                    renderSocial();
-                }
-                if (roomData.status === 'immunity') {
-                    if(oldData?.status !== 'immunity') { initImmunityUI(); }
-                    renderImmunity();
-                }
-                if (roomData.status === 'voting') {
-                    if(oldData?.status !== 'voting') { initVotingUI(); }
-                    renderVoting();
-                }
-                if (roomData.status === 'suspense') {
-                    if(oldData?.status !== 'suspense') { handleSuspensePhase(); }
-                }
-                if (roomData.status === 'elimination_challenge') {
-                    renderMinigame();
-                }
-                if (roomData.status === 'finale') {
-                    renderFinale();
-                }
-                if (roomData.status === 'ended') {
-                    renderRanking();
-                }
+                dice: {
+                    title: "Roulette Russa (Dadi)",
+                    desc: "Tira il dado. Chi fa il numero più basso perde una vita.",
+                    init(pIds) {
+                        let players = {};
+                        pIds.forEach(id => players[id] = { lives: 3, roll: null });
+                        return { players, phase: 'rolling' }; // rolling, showing
+                    },
+                    render(state, pIds) {
+                        const area = document.getElementById('minigame-render-area');
+                        this.renderHUD(state.players, pIds);
+                        
+                        area.innerHTML = `<div class="flex gap-8 justify-center items-end h-40">
+                            ${pIds.map(uid => {
+                                const p = localState.players.find(x => x.uid === uid);
+                                const myData = state.players[uid];
+                                return `<div class="flex flex-col items-center gap-2">
+                                    <div class="w-20 h-20 bg-slate-700 rounded-xl flex justify-center items-center text-4xl font-black ${myData.roll ? 'bg-blue-600' : 'animate-pulse'}">
+                                        ${myData.roll || '?'}
+                                    </div>
+                                    <img src="${ui.getChar(p.charId).url}" class="w-10 h-10 rounded-full">
+                                </div>`;
+                            }).join('')}
+                        </div>`;
 
-                // Host Autopilot (Bots and phase transitions)
-                if (isHost) hostEngineLogic(oldData);
-            });
-        }
-
-        // ==========================================
-        // LOBBY & CHAR SELECT
-        // ==========================================
-        async function renderLobby() {
-            switchView('view-lobby');
-            const grid = document.getElementById('character-grid');
-            grid.innerHTML = '';
-            
-            const players = Object.values(roomData.players);
-            document.getElementById('lobby-count').innerText = `${players.length}/${roomData.maxPlayers}`;
-            
-            const takenChars = players.map(p => p.charId).filter(id => id);
-            const myChar = roomData.players[currentUser.uid]?.charId;
-
-            CHARACTERS.forEach(c => {
-                const isTaken = takenChars.includes(c.id) && myChar !== c.id;
-                const isMine = myChar === c.id;
-                
-                const div = document.createElement('div');
-                div.className = `character-card bg-gray-700 rounded-lg p-2 text-center ${isTaken ? 'taken' : ''} ${isMine ? 'selected' : ''}`;
-                div.innerHTML = `
-                    <img src="${c.img}" alt="${c.name}" class="w-full h-24 object-cover rounded mb-2 shadow-inner" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'100\\' height=\\'100\\'><rect width=\\'100\\' height=\\'100\\' fill=\\'%23ccc\\'/></svg>'">
-                    <div class="font-bold text-sm truncate">${c.name}</div>
-                `;
-                if (!isTaken) {
-                    div.onclick = async () => {
-                        await updateDoc(doc(getPlayerPath(), currentRoomId), {
-                            [`players.${currentUser.uid}.charId`]: c.id
-                        });
-                    };
-                }
-                grid.appendChild(div);
-            });
-
-            if (isHost) {
-                document.getElementById('btn-start-game').classList.remove('hidden');
-                document.getElementById('waiting-host-msg').classList.add('hidden');
-                document.getElementById('btn-start-game').onclick = hostStartGame;
-            }
-        }
-
-        async function hostStartGame() {
-            // Check if human host has char
-            if (!roomData.players[currentUser.uid].charId) return showToast("Devi scegliere un personaggio!");
-            
-            // Fill with bots
-            let currentPlayers = Object.values(roomData.players);
-            let needed = roomData.maxPlayers - currentPlayers.length;
-            const updates = {};
-            let takenChars = currentPlayers.map(p => p.charId).filter(id=>id);
-            let availableChars = CHARACTERS.filter(c => !takenChars.includes(c.id));
-
-            // Assign chars to humans who haven't picked
-            for (let p of currentPlayers) {
-                if (!p.charId) {
-                    const c = availableChars.shift();
-                    updates[`players.${p.id}.charId`] = c.id;
-                }
-            }
-
-            for (let i = 0; i < needed; i++) {
-                const botId = `bot_${randomID()}`;
-                const char = availableChars.shift();
-                updates[`players.${botId}`] = {
-                    id: botId, name: char.name, isBot: true, charId: char.id,
-                    isEliminated: false, rank: null
-                };
-            }
-
-            updates.status = 'social';
-            updates.phaseData = { actionsDone: [] };
-            await updateDoc(doc(getPlayerPath(), currentRoomId), updates);
-        }
-
-        // ==========================================
-        // UTILS PER I DATI
-        // ==========================================
-        const getActivePlayers = () => Object.values(roomData.players).filter(p => !p.isEliminated);
-        const getCharMap = () => CHARACTERS.reduce((acc, c) => ({...acc, [c.id]: c}), {});
-        const getFriendship = (id1, id2) => {
-            const k1 = `${id1}_${id2}`; const k2 = `${id2}_${id1}`;
-            return (roomData.relationships[k1] || 0) + (roomData.relationships[k2] || 0);
-        };
-
-        // ==========================================
-        // PHASE 1: SOCIAL
-        // ==========================================
-        function initSocialPhaseUI() {
-            switchView('view-social');
-        }
-
-        function renderSocial() {
-            const amIActive = !roomData.players[currentUser.uid].isEliminated;
-            const haveIDoneAction = (roomData.phaseData.actionsDone || []).includes(currentUser.uid);
-            const chars = getCharMap();
-            
-            // My Status bar
-            const statusDiv = document.getElementById('social-my-status');
-            if (!amIActive) {
-                statusDiv.innerHTML = `<span class="text-red-500 font-bold"><i class="fas fa-ghost"></i> Sei Eliminato. Osserva!</span>`;
-            } else if (haveIDoneAction) {
-                statusDiv.innerHTML = `<span class="text-gray-400"><i class="fas fa-check-circle"></i> Azione completata. In attesa...</span>`;
-            } else {
-                statusDiv.innerHTML = `<span class="text-green-400 font-bold animate-pulse"><i class="fas fa-hand-pointer"></i> È il tuo turno! Clicca un bersaglio.</span>`;
-            }
-
-            // Grid
-            const grid = document.getElementById('social-grid');
-            grid.innerHTML = '';
-            getActivePlayers().forEach(p => {
-                const char = chars[p.charId];
-                const isMe = p.id === currentUser.uid;
-                const fPoints = isMe ? '-' : getFriendship(currentUser.uid, p.id);
-                const isEngaged = roomData.engagements[currentUser.uid] === p.id || roomData.engagements[p.id] === currentUser.uid;
-                
-                const div = document.createElement('div');
-                div.className = `w-32 bg-gray-800 rounded-lg p-2 text-center border-2 border-transparent transition ${isMe ? 'opacity-50' : 'cursor-pointer hover:border-yellow-400'}`;
-                div.innerHTML = `
-                    <div class="relative">
-                        <img src="${char.img}" class="w-24 h-24 mx-auto rounded-full object-cover border-2 border-gray-600">
-                        ${isEngaged ? '<div class="absolute top-0 right-0 bg-pink-500 rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-lg"><i class="fas fa-heart text-white"></i></div>' : ''}
-                    </div>
-                    <div class="font-bold mt-2 truncate text-sm">${p.name}</div>
-                    <div class="text-xs text-gray-400">Rel: <span class="${fPoints > 0 ? 'text-green-400' : (fPoints < 0 ? 'text-red-400' : '')}">${fPoints}</span></div>
-                `;
-                
-                if (!isMe && amIActive && !haveIDoneAction) {
-                    div.onclick = () => openSocialModal(p);
-                }
-                grid.appendChild(div);
-            });
-        }
-
-        let currentSocialTarget = null;
-        function openSocialModal(targetPlayer) {
-            currentSocialTarget = targetPlayer;
-            const chars = getCharMap();
-            document.getElementById('social-target-name').innerText = `Azione su ${targetPlayer.name}`;
-            document.getElementById('modal-social-action').classList.remove('hidden');
-        }
-        
-        document.getElementById('btn-close-social-modal').onclick = () => document.getElementById('modal-social-action').classList.add('hidden');
-        document.getElementById('btn-close-sabo-modal').onclick = () => {
-            document.getElementById('modal-sabotage-target').classList.add('hidden');
-            document.getElementById('modal-social-action').classList.remove('hidden');
-        }
-
-        document.querySelectorAll('.social-btn').forEach(btn => {
-            btn.onclick = async (e) => {
-                const action = e.currentTarget.dataset.action;
-                document.getElementById('modal-social-action').classList.add('hidden');
-                
-                if (action === 'sabotage') {
-                    // Open second target modal
-                    const list = document.getElementById('sabotage-targets-list');
-                    list.innerHTML = '';
-                    getActivePlayers().filter(p => p.id !== currentUser.uid && p.id !== currentSocialTarget.id).forEach(p => {
-                        const b = document.createElement('button');
-                        b.className = "bg-gray-800 hover:bg-gray-700 p-2 rounded text-left";
-                        b.innerText = p.name;
-                        b.onclick = () => executeSocialAction('sabotage', currentSocialTarget.id, p.id);
-                        list.appendChild(b);
-                    });
-                    document.getElementById('modal-sabotage-target').classList.remove('hidden');
-                } else {
-                    executeSocialAction(action, currentSocialTarget.id);
-                }
-            };
-        });
-
-        async function executeSocialAction(action, target1, target2 = null) {
-            document.getElementById('modal-sabotage-target').classList.add('hidden');
-            const updates = {};
-            const key1 = `${currentUser.uid}_${target1}`;
-            let logMsg = "";
-            let success = Math.random() < 0.5; // Default 50%
-            
-            const currF = getFriendship(currentUser.uid, target1);
-
-            if (action === 'friendship') {
-                if(success) { updates[`relationships.${key1}`] = currF + 1; logMsg = `Hai socializzato con successo con ${roomData.players[target1].name}!`; }
-                else { logMsg = `Tentativo di amicizia fallito con ${roomData.players[target1].name}.`; }
-            } 
-            else if (action === 'alliance') {
-                if(currF <= 0) return showToast("Serve amicizia per allearsi!");
-                if(success) { updates[`relationships.${key1}`] = currF + 2; logMsg = `Alleanza formata con ${roomData.players[target1].name}!`; }
-                else { logMsg = `${roomData.players[target1].name} ha rifiutato l'alleanza.`; }
-            }
-            else if (action === 'flirt') {
-                success = Math.random() < 0.4;
-                if(Object.keys(roomData.engagements).includes(currentUser.uid)) return showToast("Sei già fidanzato!");
-                if(success) {
-                    updates[`relationships.${key1}`] = currF + 20;
-                    updates[`engagements.${currentUser.uid}`] = target1;
-                    logMsg = `Successo! Ti sei fidanzato con ${roomData.players[target1].name}!`;
-                } else {
-                    updates[`relationships.${key1}`] = currF - 2;
-                    logMsg = `Che imbarazzo! Flirt fallito con ${roomData.players[target1].name}. (-2)`;
-                }
-            }
-            else if (action === 'suckup') {
-                success = Math.random() < 0.4;
-                if(success) {
-                    updates[`relationships.${key1}`] = currF + 3;
-                    logMsg = `Hai leccato i piedi a ${roomData.players[target1].name}! (+3)`;
-                } else {
-                    // Penality: 2 random bots dislike
-                    let bots = getActivePlayers().filter(p=>p.isBot);
-                    bots = bots.sort(() => 0.5 - Math.random()).slice(0, 2);
-                    bots.forEach(b => { updates[`relationships.${b.id}_${currentUser.uid}`] = (getFriendship(b.id, currentUser.uid) || 0) - 1; });
-                    logMsg = `Pessima figura! Alcuni hanno notato il tuo lecchinaggio.`;
-                }
-            }
-            else if (action === 'sabotage') {
-                if(success) {
-                    const saboKey = `${target1}_${target2}`;
-                    updates[`relationships.${saboKey}`] = getFriendship(target1, target2) - 1;
-                    logMsg = `Hai sabotato il rapporto tra ${roomData.players[target1].name} e ${roomData.players[target2].name}!`;
-                } else {
-                    logMsg = `Sabotaggio fallito, non ti hanno creduto.`;
-                }
-            }
-
-            showToast(logMsg);
-            
-            // Register action done
-            const doneArr = roomData.phaseData.actionsDone || [];
-            doneArr.push(currentUser.uid);
-            updates[`phaseData.actionsDone`] = doneArr;
-            
-            await updateDoc(doc(getPlayerPath(), currentRoomId), updates);
-        }
-
-        // ==========================================
-        // PHASE 2: IMMUNITY
-        // ==========================================
-        function initImmunityUI() {
-            switchView('view-immunity');
-            document.getElementById('my-dice-result').innerText = "ROLL";
-            document.getElementById('my-dice-result').classList.remove('text-green-400');
-            document.getElementById('dice-container').onclick = rollImmunityDice;
-            document.getElementById('immunity-winner-msg').classList.add('hidden');
-            document.getElementById('immunity-results-grid').innerHTML = '';
-        }
-
-        async function rollImmunityDice() {
-            if (roomData.players[currentUser.uid].isEliminated) return;
-            if (roomData.phaseData.rolls && roomData.phaseData.rolls[currentUser.uid]) return; // already rolled
-            
-            const btn = document.getElementById('dice-container');
-            const resTxt = document.getElementById('my-dice-result');
-            btn.onclick = null;
-            btn.classList.add('dice-roll-anim');
-            
-            // Visual fake rolling
-            let interval = setInterval(() => { resTxt.innerText = randInt(1, 15); }, 50);
-            await delay(1000);
-            clearInterval(interval);
-            
-            const finalRoll = randInt(1, 15);
-            resTxt.innerText = finalRoll;
-            resTxt.classList.add('text-green-400');
-            btn.classList.remove('dice-roll-anim');
-
-            await updateDoc(doc(getPlayerPath(), currentRoomId), {
-                [`phaseData.rolls.${currentUser.uid}`]: finalRoll
-            });
-        }
-
-        function renderImmunity() {
-            const grid = document.getElementById('immunity-results-grid');
-            grid.innerHTML = '';
-            const rolls = roomData.phaseData.rolls || {};
-            const chars = getCharMap();
-            
-            getActivePlayers().forEach(p => {
-                const char = chars[p.charId];
-                const roll = rolls[p.id] || '?';
-                const div = document.createElement('div');
-                div.className = "bg-gray-800 p-2 rounded flex flex-col items-center border border-gray-600";
-                div.innerHTML = `
-                    <img src="${char.img}" class="w-12 h-12 rounded-full object-cover mb-1">
-                    <span class="text-xs truncate w-full">${p.name}</span>
-                    <span class="text-2xl font-bold bangers text-yellow-400">${roll}</span>
-                `;
-                grid.appendChild(div);
-            });
-
-            if (roomData.phaseData.winner) {
-                const wMsg = document.getElementById('immunity-winner-msg');
-                wMsg.innerText = `👑 ${roomData.players[roomData.phaseData.winner].name} VINCE L'IMMUNITÀ! 👑`;
-                wMsg.classList.remove('hidden');
-            }
-        }
-
-        // ==========================================
-        // PHASE 3: VOTING
-        // ==========================================
-        function initVotingUI() {
-            switchView('view-voting');
-            document.getElementById('voting-waiting').classList.add('hidden');
-        }
-
-        function renderVoting() {
-            const grid = document.getElementById('voting-grid');
-            grid.innerHTML = '';
-            const amIActive = !roomData.players[currentUser.uid].isEliminated;
-            const haveIVoted = roomData.phaseData.votes && roomData.phaseData.votes[currentUser.uid];
-            const immunityWinner = roomData.phaseData.immunityWinner;
-            const chars = getCharMap();
-
-            if (!amIActive || haveIVoted) {
-                document.getElementById('voting-waiting').classList.remove('hidden');
-            }
-
-            getActivePlayers().forEach(p => {
-                if (p.id === currentUser.uid) return; // can't vote self
-                
-                const char = chars[p.charId];
-                const isImmune = p.id === immunityWinner;
-                
-                const div = document.createElement('div');
-                div.className = `w-32 bg-gray-800 rounded-lg p-2 text-center border-2 transition relative ${isImmune ? 'border-green-500 opacity-60' : 'cursor-pointer hover:border-red-500 border-transparent'}`;
-                
-                div.innerHTML = `
-                    <img src="${char.img}" class="w-24 h-24 mx-auto rounded-lg object-cover">
-                    <div class="font-bold mt-2 truncate text-sm">${p.name}</div>
-                    ${isImmune ? '<div class="absolute top-1 right-1 bg-green-500 text-xs px-1 rounded font-bold">IMMUNE</div>' : ''}
-                `;
-                
-                if (amIActive && !haveIVoted && !isImmune) {
-                    div.onclick = async () => {
-                        grid.innerHTML = ''; // Hide to prevent double click
-                        document.getElementById('voting-waiting').classList.remove('hidden');
-                        await updateDoc(doc(getPlayerPath(), currentRoomId), {
-                            [`phaseData.votes.${currentUser.uid}`]: p.id
-                        });
-                        showToast(`Hai votato per ${p.name}`);
-                    };
-                }
-                grid.appendChild(div);
-            });
-        }
-
-        // ==========================================
-        // PHASE 4: SUSPENSE REVEAL
-        // ==========================================
-        async function handleSuspensePhase() {
-            switchView('view-suspense');
-            const textDiv = document.getElementById('suspense-text');
-            const revealDiv = document.getElementById('nominees-reveal');
-            revealDiv.classList.add('hidden');
-            textDiv.innerHTML = '';
-            
-            // This runs on all clients. Since state is synced, we just animate the text locally based on phaseData
-            const votes = roomData.phaseData.voteCounts || {};
-            // Flatten votes into array for dramatic reading
-            let readingQueue = [];
-            for (let [uid, count] of Object.entries(votes)) {
-                for(let i=0; i<count; i++) readingQueue.push(uid);
-            }
-            // Shuffle
-            readingQueue = readingQueue.sort(() => 0.5 - Math.random());
-            
-            // Dramatic reveal
-            for (let i = 0; i < readingQueue.length; i++) {
-                const targetName = roomData.players[readingQueue[i]].name;
-                const span = document.createElement('span');
-                span.className = "suspense-reveal block mb-2";
-                span.innerText = `Un voto per... ${targetName}.`;
-                textDiv.appendChild(span);
-                textDiv.scrollTop = textDiv.scrollHeight;
-                await delay(1500);
-            }
-            
-            await delay(1000);
-            textDiv.innerHTML += `<div class="mt-4 text-red-500 font-bold suspense-reveal text-4xl bangers">I NOMINATI SONO:</div>`;
-            
-            await delay(1500);
-            
-            const nominees = roomData.phaseData.nominees || [];
-            const chars = getCharMap();
-            const portDiv = document.getElementById('nominees-portraits');
-            portDiv.innerHTML = '';
-            
-            nominees.forEach(nId => {
-                const char = chars[roomData.players[nId].charId];
-                portDiv.innerHTML += `
-                    <div class="bg-red-900 p-2 rounded border border-red-500 text-center w-32 suspense-reveal">
-                        <img src="${char.img}" class="w-full h-24 object-cover rounded">
-                        <div class="font-bold mt-1">${roomData.players[nId].name}</div>
-                    </div>
-                `;
-            });
-            
-            revealDiv.classList.remove('hidden');
-            
-            document.getElementById('minigame-announcement').innerText = `SFIDA ELIMINAZIONE: ${roomData.phaseData.minigameType.toUpperCase()}!`;
-        }
-
-        // ==========================================
-        // PHASE 5: ELIMINATION MINIGAME
-        // ==========================================
-        function renderMinigame() {
-            switchView('view-minigame');
-            const container = document.getElementById('minigame-container');
-            const title = document.getElementById('minigame-title');
-            const desc = document.getElementById('minigame-desc');
-            const status = document.getElementById('minigame-status');
-            const mgData = roomData.phaseData.minigameData;
-            const nominees = roomData.phaseData.nominees;
-            const amINominee = nominees.includes(currentUser.uid);
-            const chars = getCharMap();
-
-            // Status header
-            status.innerHTML = nominees.map(n => `<div class="${mgData.turn === n ? 'text-yellow-400 animate-pulse' : 'text-gray-500'}">${roomData.players[n].name}: ${mgData.scores ? (mgData.scores[n]||0) : (mgData.lives ? mgData.lives[n] : '')}</div>`).join(' | ');
-
-            if (roomData.phaseData.minigameType === 'memory') {
-                title.innerText = "Memory 5x5";
-                desc.innerText = "Trova le coppie! Chi finisce con meno punti è eliminato.";
-                container.innerHTML = `<div class="grid grid-cols-5 gap-2" id="memory-board"></div>`;
-                const board = document.getElementById('memory-board');
-                
-                mgData.board.forEach((emoji, idx) => {
-                    const card = document.createElement('div');
-                    card.className = "memory-card";
-                    const isMatched = mgData.matched.includes(idx);
-                    const isFlipped = mgData.flipped.includes(idx);
-                    
-                    if (isMatched) { card.classList.add('matched'); card.innerText = emoji; }
-                    else if (isFlipped) { card.classList.add('flipped'); card.innerText = emoji; }
-                    
-                    if (amINominee && mgData.turn === currentUser.uid && !isMatched && !isFlipped && mgData.flipped.length < 2) {
-                        card.onclick = () => sendMinigameMove('flip', idx);
+                        const ctrls = document.getElementById('minigame-controls');
+                        if(state.phase === 'rolling' && pIds.includes(user.uid) && !state.players[user.uid].roll) {
+                            ctrls.innerHTML = `<button onclick="actions.dice_roll()" class="bg-blue-600 hover:bg-blue-500 font-bold py-4 px-12 rounded-full text-xl shadow-lg">TIRA IL DADO</button>`;
+                        } else {
+                            ctrls.innerHTML = '';
+                        }
+                    },
+                    npcTurn(state, pIds, currentUid) {
+                        if(state.phase === 'rolling' && !state.players[currentUid].roll) {
+                            actions.dice_roll(currentUid);
+                        }
                     }
-                    board.appendChild(card);
-                });
-            } 
-            else if (roomData.phaseData.minigameType === 'dice') {
-                title.innerText = "Lancio Fortunato (Best of 3)";
-                desc.innerText = "Lancia il dado a 6 facce. Il primo a vincere 3 round è salvo.";
-                container.innerHTML = `
-                    <div class="flex justify-around items-center h-48">
-                        ${nominees.map(n => `
-                            <div class="flex flex-col items-center">
-                                <img src="${chars[roomData.players[n].charId].img}" class="w-16 h-16 rounded-full mb-2 ${mgData.turn !== n ? 'opacity-50' : ''}">
-                                <div class="text-4xl bangers bg-gray-700 w-20 h-20 flex items-center justify-center rounded border-2 border-gray-500">
-                                    ${mgData.currentRolls[n] || '?'}
-                                </div>
-                                <div class="mt-2 text-yellow-400 font-bold">Vittorie: ${mgData.scores[n]||0}</div>
-                                ${n === currentUser.uid && mgData.turn === n ? `<button class="mt-4 bg-green-600 px-4 py-2 rounded font-bold" onclick="sendMinigameMove('roll')">LANCIA</button>` : ''}
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
-            else if (roomData.phaseData.minigameType === 'minefield') {
-                const cols = nominees.length === 3 ? 7 : 6;
-                title.innerText = `Campo Minato ${cols}x${cols}`;
-                desc.innerText = "Scegli una casella. Verde = Salvo, Rossa = Lava (-1 vita). Arriva a 0 vite e sei fuori.";
-                container.innerHTML = `<div class="grid gap-1" style="grid-template-columns: repeat(${cols}, minmax(0, 1fr));" id="mine-board"></div>`;
-                const board = document.getElementById('mine-board');
-                
-                mgData.board.forEach((cell, idx) => {
-                    const btn = document.createElement('div');
-                    btn.className = "mine-btn";
-                    if (cell.revealed) {
-                        btn.classList.add(cell.isLava ? 'lava' : 'safe');
-                        btn.innerHTML = cell.isLava ? '🔥' : '✅';
-                        btn.classList.add('flex', 'items-center', 'justify-center');
-                    }
-                    
-                    if (amINominee && mgData.turn === currentUser.uid && !cell.revealed) {
-                        btn.onclick = () => sendMinigameMove('pick', idx);
-                    }
-                    board.appendChild(btn);
-                });
-            }
-            else if (roomData.phaseData.minigameType === 'salvation') {
-                title.innerText = "Votazione di Salvezza";
-                desc.innerText = "I giocatori salvi votano chi tenere. Il meno votato esce.";
-                container.innerHTML = `<div class="flex justify-around" id="salvation-board"></div>`;
-                const board = document.getElementById('salvation-board');
-                
-                const amISafe = !amINominee && !roomData.players[currentUser.uid].isEliminated;
-                const haveIVoted = mgData.votes && mgData.votes[currentUser.uid];
+                },
 
-                nominees.forEach(n => {
-                    const div = document.createElement('div');
-                    div.className = "text-center";
-                    div.innerHTML = `
-                        <img src="${chars[roomData.players[n].charId].img}" class="w-32 h-32 rounded-lg object-cover mb-2 border-2 border-gray-600">
-                        <div class="font-bold">${roomData.players[n].name}</div>
-                        ${amISafe && !haveIVoted ? `<button class="mt-2 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-bold" onclick="sendMinigameMove('vote', '${n}')">SALVA</button>` : ''}
-                        <div class="mt-2 text-xl">${mgData.resultsShown ? `Voti: ${mgData.voteCounts[n] || 0}` : ''}</div>
-                    `;
-                    board.appendChild(div);
-                });
-            }
-        }
+                reaction: {
+                    title: "Reaction Test",
+                    desc: "Clicca il pulsante quando diventa VERDE! Il primo a 3 punti è salvo.",
+                    init(pIds) {
+                        let players = {};
+                        pIds.forEach(id => players[id] = { points: 0 });
+                        return { players, status: 'waiting', triggerTime: Date.now() + 2000 + Math.random()*3000 };
+                    },
+                    render(state, pIds) {
+                        this.renderHUD(state.players, pIds, null, 'points', '⭐');
+                        const area = document.getElementById('minigame-render-area');
+                        
+                        let isGreen = state.status === 'ready';
+                        let canClick = isGreen && pIds.includes(user.uid);
 
-        async function sendMinigameMove(action, value = null) {
-            // Write action to a 'pendingMove' queue so host can process it securely
-            await updateDoc(doc(getPlayerPath(), currentRoomId), {
-                [`phaseData.pendingMove`]: { uid: currentUser.uid, action, value, ts: Date.now() }
-            });
-        }
+                        area.innerHTML = `
+                            <button id="reaction-btn" 
+                                class="w-64 h-64 rounded-full font-black text-4xl shadow-2xl transition-colors duration-75 
+                                ${isGreen ? 'bg-green-500 text-white cursor-pointer active:scale-95' : 'bg-red-500 text-red-900 cursor-not-allowed'}"
+                                onclick="if(${canClick}) actions.reaction_click()">
+                                ${isGreen ? 'CLICCA!' : 'ATTENDI...'}
+                            </button>
+                        `;
 
-        // ==========================================
-        // FINALE & RANKING
-        // ==========================================
-        function renderFinale() {
-            switchView('view-finale');
-            // Simplified finale view, reuses minigame structure in DB logic
-            const fData = roomData.phaseData;
-            const chars = getCharMap();
-            document.getElementById('finale-combatants').innerHTML = fData.finalists.map(n => `
-                <div class="text-center">
-                    <img src="${chars[roomData.players[n].charId].img}" class="w-40 h-40 rounded-full border-4 border-yellow-500 shadow-[0_0_20px_gold] object-cover">
-                    <div class="text-2xl mt-4 font-bold">${roomData.players[n].name}</div>
-                </div>
-            `).join('<div class="text-6xl text-red-500 bangers mx-8">VS</div>');
-            
-            document.getElementById('finale-score').innerText = `${fData.scores[fData.finalists[0]] || 0} - ${fData.scores[fData.finalists[1]] || 0}`;
-            
-            // se c'è un minigioco in corso nella finale, mostralo. Riutilizziamo renderMinigame iniettandolo nel div.
-            if(fData.minigameData) {
-                document.getElementById('finale-minigame-area').innerHTML = `<div id="sub-minigame" class="w-full max-w-2xl bg-gray-800 p-4 rounded"></div>`;
-                // Logic is complex to nest, for Canvas we'll assume host transitions to standard minigame view, just with 'finale' flag.
-                // Actually, letting it use standard view-minigame is better. Host logic will handle it.
-            }
-        }
-
-        function renderRanking() {
-            switchView('view-ranking');
-            const list = document.getElementById('ranking-list');
-            list.innerHTML = '';
-            const ranking = roomData.ranking || [];
-            const chars = getCharMap();
-            
-            ranking.forEach((entry, idx) => {
-                const isWinner = idx === 0;
-                list.innerHTML += `
-                    <div class="flex items-center gap-4 p-3 ${isWinner ? 'bg-yellow-600 border-2 border-yellow-400' : 'bg-gray-700'} rounded shadow">
-                        <div class="text-3xl font-bold ${isWinner ? 'text-white' : 'text-gray-400'} w-8 text-center">${idx + 1}</div>
-                        <img src="${chars[entry.charId].img}" class="w-12 h-12 rounded-full object-cover">
-                        <div class="font-bold text-xl">${entry.name}</div>
-                        ${isWinner ? '<i class="fas fa-trophy text-yellow-300 text-2xl ml-auto"></i>' : ''}
-                    </div>
-                `;
-            });
-        }
-
-        // ==========================================
-        // SERVER / HOST LOGIC ENGINE
-        // ==========================================
-        // This runs ONLY on the host to simulate a backend server for sync & bot AI.
-        
-        let hostLock = false; // Prevent overlapping loops
-
-        async function hostEngineLogic(oldData) {
-            if (hostLock) return;
-            hostLock = true;
-            try {
-                const status = roomData.status;
-                const pData = roomData.phaseData;
-                const players = Object.values(roomData.players);
-                const activeBots = players.filter(p => p.isBot && !p.isEliminated);
-                const activePlayers = players.filter(p => !p.isEliminated);
-
-                // --- PHASE: SOCIAL ---
-                if (status === 'social') {
-                    const done = pData.actionsDone || [];
-                    
-                    // Do bot actions gradually
-                    for (let bot of activeBots) {
-                        if (!done.includes(bot.id)) {
-                            await delay(1000); // realistic delay
-                            // Simple AI: Random target, preference for flirt/friendship
-                            const targets = activePlayers.filter(p => p.id !== bot.id);
-                            const t = targets[randInt(0, targets.length-1)];
-                            const acts = ['friendship', 'friendship', 'flirt', 'suckup', 'sabotage'];
-                            const act = acts[randInt(0, acts.length-1)];
-                            
-                            // Simulate action logic inline (host writes result directly)
-                            let rKey = `${bot.id}_${t.id}`;
-                            let currF = getFriendship(bot.id, t.id);
-                            let updates = { [`phaseData.actionsDone`]: [...(roomData.phaseData.actionsDone||[]), bot.id] };
-                            
-                            if(act === 'friendship' && Math.random()<0.5) updates[`relationships.${rKey}`] = currF + 1;
-                            else if(act === 'flirt' && Math.random()<0.4 && !roomData.engagements[bot.id]) {
-                                updates[`relationships.${rKey}`] = currF + 20; updates[`engagements.${bot.id}`] = t.id;
+                        // Client-side visual update if waiting (doesn't write to DB)
+                        if(state.status === 'waiting' && state.triggerTime) {
+                            const timeToWait = state.triggerTime - Date.now();
+                            if(timeToWait > 0) {
+                                setTimeout(() => {
+                                    const btn = document.getElementById('reaction-btn');
+                                    if(btn) { btn.classList.replace('bg-red-500', 'bg-green-500'); btn.classList.replace('text-red-900', 'text-white'); btn.innerText = 'CLICCA!'; }
+                                }, timeToWait);
                             }
-                            await updateDoc(doc(getPlayerPath(), currentRoomId), updates);
-                            break; // Do one bot per loop to allow snapshot updates
+                        }
+                    },
+                    npcTurn(state, pIds, currentUid) {
+                        if(state.status === 'waiting' && state.triggerTime && Date.now() >= state.triggerTime) {
+                            // Simuliamo reazione
+                            const delay = 300 + Math.random() * 500; // 300-800ms
+                            setTimeout(() => {
+                                // Double check if state hasn't changed
+                                if(localState.gameState.minigameState.status === 'waiting') {
+                                    actions.reaction_click(currentUid);
+                                }
+                            }, delay);
                         }
                     }
+                },
 
-                    // Check if phase complete
-                    if ((roomData.phaseData.actionsDone||[]).length >= activePlayers.length) {
-                        await delay(2000);
-                        await updateDoc(doc(getPlayerPath(), currentRoomId), {
-                            status: 'immunity', phaseData: { rolls: {} }
+                // GIOCHI SEMPLIFICATI PER SPAZIO E STABILITÀ
+                mash: {
+                    title: "Button Mash",
+                    desc: "Clicca più veloce che puoi in 10 secondi! Chi fa meno click perde 1 vita.",
+                    init(pIds) {
+                        let players = {};
+                        pIds.forEach(id => players[id] = { clicks: 0, lives: 2 });
+                        return { players, endTime: Date.now() + 10000, phase: 'playing' };
+                    },
+                    render(state, pIds) {
+                        this.renderHUD(state.players, pIds);
+                        const area = document.getElementById('minigame-render-area');
+                        let timeLeft = Math.max(0, Math.ceil((state.endTime - Date.now())/1000));
+                        
+                        area.innerHTML = `
+                            <div class="flex flex-col items-center">
+                                <div class="text-6xl font-black text-yellow-400 mb-8">${timeLeft}s</div>
+                                ${state.phase === 'playing' && pIds.includes(user.uid) ? 
+                                `<button onclick="actions.mash_click()" class="bg-purple-600 hover:bg-purple-500 active:bg-purple-800 w-48 h-48 rounded-full text-3xl font-bold shadow-[0_10px_0_#4c1d95] active:translate-y-2 active:shadow-none transition-all">MASH!</button>`
+                                : '<div class="text-slate-500 text-xl">Spettatore</div>'}
+                            </div>
+                        `;
+                        // Aggiorna timer UI locale
+                        if(state.phase === 'playing' && !window.mashInterval) {
+                            window.mashInterval = setInterval(() => {
+                                if(localState.gameState.currentMinigame !== 'mash') { clearInterval(window.mashInterval); window.mashInterval=null; return; }
+                                logic.renderGame();
+                            }, 1000);
+                        }
+                    },
+                    npcTurn(state, pIds, currentUid) {
+                        // Gli NPC cliccano "virtualmente" inviando un burst di click
+                        if(state.phase === 'playing' && Math.random() > 0.5) {
+                            actions.mash_click(currentUid, Math.floor(Math.random() * 3) + 1); // 1-3 click in un batch
+                        }
+                    }
+                },
+
+                voting: {
+                    title: "Giudizio Universale",
+                    desc: "I giocatori SALVI votano chi eliminare. Se c'è parità, decide la sorte.",
+                    init(pIds) {
+                        let votes = {};
+                        localState.players.filter(p => p.isAlive && !pIds.includes(p.uid)).forEach(p => {
+                            votes[p.uid] = null; // Chi ha votato chi
                         });
-                    }
-                }
-
-                // --- PHASE: IMMUNITY ---
-                if (status === 'immunity' && !pData.winner) {
-                    // Bots roll
-                    const rolls = pData.rolls || {};
-                    let botsRolled = false;
-                    for (let bot of activeBots) {
-                        if (!rolls[bot.id]) {
-                            rolls[bot.id] = randInt(1, 15);
-                            botsRolled = true;
-                        }
-                    }
-                    if(botsRolled) {
-                        await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.rolls`]: rolls });
-                    }
-
-                    // Check if all rolled
-                    if (Object.keys(pData.rolls || {}).length >= activePlayers.length) {
-                        let winnerId = activePlayers[0].id;
-                        let maxRoll = -1;
-                        for(let [id, val] of Object.entries(pData.rolls)) {
-                            if(val > maxRoll) { maxRoll = val; winnerId = id; }
-                        }
-                        await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.winner`]: winnerId, [`phaseData.immunityWinner`]: winnerId });
-                        await delay(4000);
-                        await updateDoc(doc(getPlayerPath(), currentRoomId), { status: 'voting', phaseData: { votes: {}, immunityWinner: winnerId } });
-                    }
-                }
-
-                // --- PHASE: VOTING ---
-                if (status === 'voting') {
-                    const votes = pData.votes || {};
-                    const immunityWinner = pData.immunityWinner;
-                    const validTargets = activePlayers.filter(p => p.id !== immunityWinner);
-                    
-                    let botsVoted = false;
-                    for (let bot of activeBots) {
-                        if (!votes[bot.id]) {
-                            // AI: Vote for least friend
-                            let leastFriend = validTargets[0];
-                            let minF = 999;
-                            validTargets.forEach(t => {
-                                if(t.id === bot.id) return;
-                                let f = getFriendship(bot.id, t.id);
-                                if(f < minF) { minF = f; leastFriend = t; }
-                            });
-                            votes[bot.id] = leastFriend.id;
-                            botsVoted = true;
-                        }
-                    }
-                    if(botsVoted) {
-                        await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.votes`]: votes });
-                    }
-
-                    if (Object.keys(pData.votes || {}).length >= activePlayers.length) {
-                        // Calculate nominees
-                        const counts = {};
-                        validTargets.forEach(t => counts[t.id] = 0);
-                        Object.values(pData.votes).forEach(v => counts[v]++);
+                        return { votes, options: pIds, phase: 'voting' };
+                    },
+                    render(state, pIds) {
+                        const area = document.getElementById('minigame-render-area');
+                        const isVoter = state.votes.hasOwnProperty(user.uid);
+                        const hasVoted = state.votes[user.uid] !== null;
                         
-                        const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
-                        const numNominees = activePlayers.length >= 14 ? 3 : 2;
-                        const nominees = sorted.slice(0, numNominees).map(x => x[0]);
-                        
-                        // Select random minigame
-                        const minigames = ['memory', 'dice', 'minefield', 'salvation'];
-                        const mgType = minigames[randInt(0, minigames.length-1)];
-                        
-                        await updateDoc(doc(getPlayerPath(), currentRoomId), {
-                            status: 'suspense',
-                            phaseData: { voteCounts: counts, nominees, minigameType: mgType }
+                        let html = `<div class="flex gap-8 justify-center mb-8">`;
+                        pIds.forEach(uid => {
+                            const p = localState.players.find(x => x.uid === uid);
+                            const voteCount = Object.values(state.votes).filter(v => v === uid).length;
+                            html += `<div class="flex flex-col items-center bg-slate-700 p-4 rounded-xl">
+                                <img src="${ui.getChar(p.charId).url}" class="w-24 h-24 object-cover rounded mb-2">
+                                <span class="font-bold">${p.name}</span>
+                                <div class="text-3xl text-red-500 mt-2 font-black">${state.phase==='result' ? voteCount : '?'}</div>
+                                ${isVoter && !hasVoted && state.phase === 'voting' ? `<button onclick="actions.voting_vote('${uid}')" class="mt-4 bg-red-600 px-4 py-2 rounded font-bold hover:bg-red-500">VOTA</button>` : ''}
+                            </div>`;
                         });
+                        html += `</div>`;
                         
-                        // Wait for suspense animation (approx 10-15s) then go to minigame
-                        setTimeout(async () => {
-                            await setupMinigame(mgType, nominees);
-                        }, Object.keys(pData.votes).length * 1500 + 5000);
+                        if(state.phase === 'voting') {
+                            const totalVoters = Object.keys(state.votes).length;
+                            const casted = Object.values(state.votes).filter(v => v !== null).length;
+                            html += `<p class="text-slate-400">Voti inviati: ${casted} / ${totalVoters}</p>`;
+                            if(!isVoter) html += `<p class="text-yellow-400 mt-2">I superstiti stanno decidendo la tua sorte...</p>`;
+                        }
+                        
+                        area.innerHTML = html;
+                    },
+                    npcTurn(state, pIds, currentUid) {
+                        // NPC Spectators vote randomly
+                        if(state.phase === 'voting') {
+                            const unvotedNpcs = Object.keys(state.votes).filter(uid => state.votes[uid] === null && localState.players.find(p=>p.uid===uid)?.isNpc);
+                            if(unvotedNpcs.length > 0) {
+                                const npc = unvotedNpcs[0]; // Process one at a time for realism
+                                const choice = state.options[Math.floor(Math.random() * state.options.length)];
+                                actions.voting_vote(choice, npc);
+                            }
+                        }
+                    }
+                },
+
+                bomb: {
+                    title: "Bomba a Orologeria",
+                    desc: "Passa la bomba prima che esploda! Il timer è invisibile (10-25 sec).",
+                    init(pIds) {
+                        return { phase: 'playing', holderIndex: 0, endTime: Date.now() + 10000 + Math.random() * 15000 };
+                    },
+                    render(state, pIds) {
+                        const area = document.getElementById('minigame-render-area');
+                        const holderUid = pIds[state.holderIndex];
+                        const holder = localState.players.find(p => p.uid === holderUid);
+                        const isMyTurn = holderUid === user.uid && state.phase === 'playing';
+
+                        area.innerHTML = `
+                            <div class="flex flex-col items-center">
+                                <div class="text-8xl mb-8 ${state.phase === 'playing' ? 'animate-pulse' : 'scale-150 transition-transform'}">
+                                    ${state.phase === 'playing' ? '💣' : '💥'}
+                                </div>
+                                <h3 class="text-xl mb-4 text-center">In mano a: <strong class="text-yellow-400">${holder.name}</strong></h3>
+                                ${isMyTurn ? `<button onclick="actions.bomb_pass()" class="bg-red-600 hover:bg-red-500 text-white font-black py-4 px-12 rounded-full text-2xl shadow-[0_0_20px_#ef4444]">PASSA!</button>` : ''}
+                            </div>
+                        `;
+
+                        // Suono Tick
+                        if (state.phase === 'playing' && !window.bombTickInterval) {
+                            window.bombTickInterval = setInterval(() => {
+                                if (localState.gameState.currentMinigame !== 'bomb' || localState.gameState.minigameState.phase !== 'playing') {
+                                    clearInterval(window.bombTickInterval); window.bombTickInterval = null; return;
+                                }
+                                audioEngine.playTick();
+                            }, 600); // Batte il tempo
+                        }
+                    },
+                    npcTurn(state, pIds, currentUid) {
+                        if (pIds[state.holderIndex] === currentUid && state.phase === 'playing') {
+                            setTimeout(() => {
+                                if (localState.gameState.minigameState.phase === 'playing') actions.bomb_pass(currentUid);
+                            }, 400 + Math.random() * 1000); // Reazione rapida o lenta
+                        }
+                    }
+                },
+
+                sequence: {
+                    title: "Ordine Numerico",
+                    desc: "Trova e clicca i numeri in ordine da 1 a 7! Se sbagli, perdi il turno e tutto si nasconde.",
+                    init(pIds) {
+                        const seq = ui.shuffle([1,2,3,4,5,6,7]);
+                        const colors = ui.shuffle(['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899']);
+                        return { sequence: seq, colors: colors, progress: 0, turnIndex: 0, phase: 'playing', errorIndex: null, winners: [], known: [] };
+                    },
+                    render(state, pIds) {
+                        const area = document.getElementById('minigame-render-area');
+                        
+                        // Chi tocca? Salta chi ha già vinto
+                        let activeUid = pIds[state.turnIndex];
+                        const activePlayer = localState.players.find(p => p.uid === activeUid);
+                        const isMyTurn = activeUid === user.uid && state.phase === 'playing';
+
+                        let html = `
+                            <div class="w-full flex flex-col items-center">
+                                <div class="mb-4 text-lg">Turno di: <strong class="text-blue-400">${activePlayer.name}</strong></div>
+                                <div class="mb-6 text-xl text-yellow-300 font-bold">Prossimo numero da trovare: ${state.progress + 1}</div>
+                                <div class="flex gap-4 flex-wrap justify-center max-w-lg">
+                        `;
+
+                        state.sequence.forEach((num, i) => {
+                            const isRevealed = num <= state.progress;
+                            const isError = state.phase === 'showing_error' && state.errorIndex === i;
+                            const bgColor = state.colors[i];
+                            
+                            let classes = 'seq-circle';
+                            let content = '?';
+                            
+                            if (isRevealed) {
+                                classes += ' open';
+                                content = num;
+                            } else if (isError) {
+                                classes += ' error';
+                                content = num; // Mostra l'errore per farlo memorizzare
+                            } else {
+                                classes += ' closed';
+                            }
+
+                            html += `<div class="${classes}" style="background-color: ${bgColor}" onclick="if(${isMyTurn}) actions.sequence_click(${i})">${content}</div>`;
+                        });
+
+                        html += `</div></div>`;
+                        area.innerHTML = html;
+
+                        // Visualizzazione Vincitori Locali
+                        if(state.winners.length > 0) {
+                            area.innerHTML += `<div class="mt-6 text-green-400 font-bold">Salvi: ${state.winners.map(id => localState.players.find(p=>p.uid===id).name).join(', ')}</div>`;
+                        }
+                    },
+                    npcTurn(state, pIds, currentUid) {
+                        if (pIds[state.turnIndex] === currentUid && state.phase === 'playing') {
+                            const targetNum = state.progress + 1;
+                            let targetIdx = -1;
+                            
+                            // Ha il 75% di probabilità di ricordare un numero se è già stato rivelato in passato
+                            if (state.known && state.known.includes(targetNum) && Math.random() > 0.25) {
+                                targetIdx = state.sequence.indexOf(targetNum);
+                            } else {
+                                // Altrimenti clicca a caso tra quelli non ancora indovinati
+                                const unknownIndices = state.sequence.map((n, i) => n > state.progress ? i : -1).filter(i => i !== -1);
+                                targetIdx = unknownIndices[Math.random() * unknownIndices.length | 0];
+                            }
+                            
+                            actions.sequence_click(targetIdx, currentUid);
+                        }
                     }
                 }
+            },
 
-                // --- PHASE: MINIGAME (ENGINE) ---
-                if (status === 'elimination_challenge') {
-                    await processMinigameLogic();
-                }
-
-            } catch (e) { console.error("Host logic error:", e); }
-            finally { hostLock = false; }
-        }
-
-        async function setupMinigame(type, nominees) {
-            let mgData = { turn: nominees[0], turnIndex: 0 };
+            hostInit(gameName, pIds) {
+                return this.games[gameName].init(pIds);
+            },
             
-            if(type === 'memory') {
-                const emojis = ['🍎','🍌','🍇','🍉','🍓','🍒','🍍','🥥','🥝','🍋','🍈','🍏'];
-                let deck = [];
-                for(let i=0; i<12; i++) { deck.push(emojis[i], emojis[i]); }
-                deck.push('💣'); // the odd one out for 25 cards
-                deck = deck.sort(() => 0.5 - Math.random());
-                mgData = { ...mgData, board: deck, flipped: [], matched: [], scores: {}, knownCards: {} };
-                nominees.forEach(n => mgData.scores[n] = 0);
-            }
-            else if(type === 'dice') {
-                mgData = { ...mgData, scores: {}, currentRolls: {} };
-                nominees.forEach(n => mgData.scores[n] = 0);
-            }
-            else if(type === 'minefield') {
-                const cols = nominees.length === 3 ? 7 : 6;
-                const total = cols*cols;
-                const lavaCount = nominees.length === 3 ? 9 : 5;
-                let b = Array(total).fill({ isLava: false, revealed: false });
-                for(let i=0; i<lavaCount; i++) b[i] = { isLava: true, revealed: false };
-                b = b.sort(() => 0.5 - Math.random());
-                mgData = { ...mgData, board: b, lives: {} };
-                nominees.forEach(n => mgData.lives[n] = 3);
-            }
-            else if(type === 'salvation') {
-                mgData = { votes: {}, voteCounts: {}, resultsShown: false };
-            }
+            render(gameName, state, pIds) {
+                const game = this.games[gameName];
+                document.getElementById('minigame-title').innerText = game.title;
+                document.getElementById('minigame-desc').innerText = game.desc;
+                game.render.call(this, state, pIds); // .call per passare il this
+            },
 
-            await updateDoc(doc(getPlayerPath(), currentRoomId), {
-                status: 'elimination_challenge',
-                [`phaseData.minigameData`]: mgData
-            });
-        }
+            renderHUD(playersState, pIds, highlightUid = null, statName = 'lives', statIcon = '❤️') {
+                const hud = document.getElementById('minigame-players-hud');
+                if(!hud) return;
+                hud.innerHTML = pIds.map(uid => {
+                    const p = localState.players.find(x => x.uid === uid) || { name: 'Sconosciuto' };
+                    const stats = (playersState && playersState[uid]) ? playersState[uid] : {};
+                    const val = stats[statName] || 0;
+                    return `
+                        <div class="flex flex-col items-center bg-slate-900 px-6 py-2 rounded-lg border ${uid === highlightUid ? 'border-green-500 shadow-[0_0_10px_#10b981]' : 'border-slate-700'}">
+                            <span class="text-xs text-slate-400 mb-1">${p.name}</span>
+                            <div class="flex gap-1">${String(statIcon).repeat(Math.max(0, val))}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        };
 
-        async function processMinigameLogic() {
-            const mgType = roomData.phaseData.minigameType;
-            let mgData = { ...roomData.phaseData.minigameData };
-            const nominees = roomData.phaseData.nominees;
-            const turnPlayer = roomData.players[mgData.turn];
-            
-            // Handle pending moves from clients
-            if (roomData.phaseData.pendingMove) {
-                const move = roomData.phaseData.pendingMove;
-                if (move.uid === mgData.turn || mgType === 'salvation') {
-                    // Apply move based on game type
-                    if(mgType === 'memory' && move.action === 'flip') {
-                        mgData.flipped.push(move.value);
-                    }
-                    if(mgType === 'minefield' && move.action === 'pick') {
-                        mgData.board[move.value].revealed = true;
-                        if(mgData.board[move.value].isLava) mgData.lives[move.uid]--;
-                        mgData.turnIndex = (mgData.turnIndex + 1) % nominees.length;
-                        mgData.turn = nominees[mgData.turnIndex];
-                    }
-                    if(mgType === 'dice' && move.action === 'roll') {
-                        mgData.currentRolls[move.uid] = randInt(1, 6);
-                        mgData.turnIndex = (mgData.turnIndex + 1) % nominees.length;
-                        mgData.turn = nominees[mgData.turnIndex];
-                    }
-                    if(mgType === 'salvation' && move.action === 'vote') {
-                        mgData.votes[move.uid] = move.value;
-                    }
-                }
-                // clear pending move
-                await updateDoc(doc(getPlayerPath(), currentRoomId), {
-                    [`phaseData.minigameData`]: mgData,
-                    [`phaseData.pendingMove`]: null
+        // ==========================================
+        // PLAYER ACTIONS (Aggiornano Firestore)
+        // ==========================================
+        const actions = {
+            async updateState(newStateUpdate) {
+                await updateDoc(logic.getRoomDoc(currentRoomId), {
+                    'gameState.minigameState': newStateUpdate
                 });
-                return; // exit loop, let snapshot trigger next tick
-            }
-
-            // BOT AI LOGIC
-            if (turnPlayer && turnPlayer.isBot) {
-                await delay(1500); // Thinking delay
-                if(mgType === 'memory' && mgData.flipped.length < 2) {
-                    let choice = -1;
-                    // AI: 60% chance to use memory if known
-                    if (Math.random() < 0.6 && Object.keys(mgData.knownCards).length > 0 && mgData.flipped.length === 1) {
-                        const targetEmoji = mgData.board[mgData.flipped[0]];
-                        for(let [idx, em] of Object.entries(mgData.knownCards)) {
-                            if(em === targetEmoji && parseInt(idx) !== mgData.flipped[0]) choice = parseInt(idx);
-                        }
-                    }
-                    if (choice === -1) {
-                        // Random unrevealed
-                        let valid = [];
-                        mgData.board.forEach((_,i) => { if(!mgData.matched.includes(i) && !mgData.flipped.includes(i)) valid.push(i); });
-                        choice = valid[randInt(0, valid.length-1)];
-                    }
-                    mgData.flipped.push(choice);
-                    await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.minigameData.flipped`]: mgData.flipped });
-                    return;
-                }
-                if(mgType === 'minefield') {
-                    let valid = [];
-                    mgData.board.forEach((c,i) => { if(!c.revealed) valid.push(i); });
-                    let choice = valid[randInt(0, valid.length-1)];
-                    await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.pendingMove`]: { uid: turnPlayer.id, action: 'pick', value: choice } });
-                    return;
-                }
-                if(mgType === 'dice') {
-                    await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.pendingMove`]: { uid: turnPlayer.id, action: 'roll' } });
-                    return;
-                }
-            }
+            },
             
-            // Salvation bot logic (all at once)
-            if (mgType === 'salvation') {
-                const voters = Object.values(roomData.players).filter(p => !p.isEliminated && !nominees.includes(p.id));
-                let botsVoted = false;
-                for(let b of voters) {
-                    if (b.isBot && !mgData.votes[b.id]) {
-                        // Bot saves highest friend
-                        let best = nominees[0];
-                        let maxF = -999;
-                        nominees.forEach(n => {
-                            let f = getFriendship(b.id, n);
-                            if(f > maxF) { maxF = f; best = n; }
-                        });
-                        mgData.votes[b.id] = best;
-                        botsVoted = true;
+            async recordStatLoss(uid) {
+                let updatedPlayers = [...localState.players];
+                let p = updatedPlayers.find(x => x.uid === uid);
+                if(p) p.stats.livesLost++;
+                await updateDoc(logic.getRoomDoc(currentRoomId), { players: updatedPlayers });
+            },
+
+            // --- TILES ---
+            async tiles_click(index, overrideUid = null) {
+                const uid = overrideUid || user.uid;
+                let state = localState.gameState.minigameState;
+                if(localState.gameState.phase !== 'playing') return;
+                if(localState.gameState.selectedPlayers[state.turnIndex] !== uid) return;
+                
+                let newTiles = [...state.tiles];
+                newTiles[index].revealed = true;
+                
+                let newPlayers = JSON.parse(JSON.stringify(state.players));
+                let endRound = false;
+                let loser = null;
+
+                if(newTiles[index].type === 'bomb') {
+                    newPlayers[uid].lives--;
+                    this.recordStatLoss(uid);
+                    if(newPlayers[uid].lives <= 0) {
+                        endRound = true;
+                        loser = uid;
                     }
                 }
-                if(botsVoted) await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.minigameData.votes`]: mgData.votes });
-                
-                // End Salvation check
-                if (Object.keys(mgData.votes).length >= voters.length && !mgData.resultsProcessed) {
-                    mgData.resultsProcessed = true;
-                    let counts = {};
-                    nominees.forEach(n => counts[n] = 0);
-                    Object.values(mgData.votes).forEach(v => counts[v]++);
-                    mgData.voteCounts = counts;
-                    mgData.resultsShown = true;
-                    await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.minigameData`]: mgData });
-                    
-                    // Determine loser (lowest votes)
-                    await delay(3000);
-                    let loser = nominees.sort((a,b) => counts[a] - counts[b])[0]; // smallest
-                    await eliminatePlayer(loser);
-                    return;
-                }
-            }
 
-            // --- MINIGAME RULE CHECKING ---
-            
-            // Memory Resolution
-            if (mgType === 'memory' && mgData.flipped.length === 2 && !mgData.resolving) {
-                mgData.resolving = true;
-                await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.minigameData.resolving`]: true });
-                await delay(2000);
-                
-                const c1 = mgData.flipped[0]; const c2 = mgData.flipped[1];
-                mgData.knownCards[c1] = mgData.board[c1];
-                mgData.knownCards[c2] = mgData.board[c2];
-                
-                if (mgData.board[c1] === mgData.board[c2] && mgData.board[c1] !== '💣') {
-                    mgData.matched.push(c1, c2);
-                    mgData.scores[mgData.turn] += 1;
-                    // Player keeps turn
+                let nextTurn = (state.turnIndex + 1) % localState.gameState.selectedPlayers.length;
+
+                if(endRound) {
+                    await hostEngine.resolveGame([loser]);
                 } else {
-                    // Next turn
-                    mgData.turnIndex = (mgData.turnIndex + 1) % nominees.length;
-                    mgData.turn = nominees[mgData.turnIndex];
+                    await this.updateState({ ...state, tiles: newTiles, players: newPlayers, turnIndex: nextTurn });
                 }
-                mgData.flipped = [];
-                mgData.resolving = false;
-                await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.minigameData`]: mgData });
-                
-                // End Memory Check
-                if (mgData.matched.length >= 24) { // 12 pairs
-                    let loser = nominees.sort((a,b) => mgData.scores[a] - mgData.scores[b])[0];
-                    await delay(2000);
-                    await eliminatePlayer(loser);
-                }
-                return;
-            }
+            },
 
-            // Minefield Resolution
-            if (mgType === 'minefield') {
-                for (let n of nominees) {
-                    if (mgData.lives[n] <= 0) {
-                        await delay(2000);
-                        await eliminatePlayer(n);
-                        return; // Prevent multiple elims
+            // --- DICE ---
+            async dice_roll(overrideUid = null) {
+                const uid = overrideUid || user.uid;
+                let state = localState.gameState.minigameState;
+                
+                if(localState.gameState.phase !== 'playing' || state.phase !== 'rolling') return;
+                if(!state.players || !state.players[uid] || state.players[uid].roll !== null) return;
+                
+                let newPlayers = JSON.parse(JSON.stringify(state.players));
+                newPlayers[uid].roll = Math.floor(Math.random() * 6) + 1;
+                
+                let updateData = { ...state, players: newPlayers };
+                
+                // Check if all rolled
+                const allRolled = Object.values(newPlayers).every(p => p.roll !== null);
+                if(allRolled) {
+                    updateData.phase = 'showing';
+                }
+                await this.updateState(updateData);
+            },
+
+            // --- REACTION ---
+            async reaction_click(overrideUid = null) {
+                const uid = overrideUid || user.uid;
+                let state = localState.gameState.minigameState;
+                if(localState.gameState.phase !== 'playing' || state.status !== 'waiting') return; // already clicked
+
+                // Check se ha cliccato troppo presto (rosso) - penalità opzionale, qui lo ignoro.
+                // Se status è waiting e tempo superato
+                if(Date.now() >= state.triggerTime) {
+                    let newPlayers = JSON.parse(JSON.stringify(state.players));
+                    newPlayers[uid].points++;
+                    
+                    if(newPlayers[uid].points >= 3) {
+                        // Vince lui, perdono gli altri
+                        const losers = localState.gameState.selectedPlayers.filter(id => id !== uid);
+                        hostEngine.resolveGame(losers);
+                    } else {
+                        // Nuovo round reaction
+                        await this.updateState({
+                            ...state,
+                            players: newPlayers,
+                            status: 'waiting',
+                            triggerTime: Date.now() + 2000 + Math.random()*3000
+                        });
                     }
                 }
-            }
+            },
 
-            // Dice Resolution (Round end)
-            if (mgType === 'dice') {
-                const rollsDone = nominees.every(n => mgData.currentRolls[n]);
-                if (rollsDone && !mgData.resolving) {
-                    mgData.resolving = true;
-                    await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.minigameData.resolving`]: true });
-                    await delay(2000);
+            // --- MASH ---
+            async mash_click(overrideUid = null, amt = 1) {
+                const uid = overrideUid || user.uid;
+                let state = localState.gameState.minigameState;
+                if(state.phase !== 'playing') return;
+                
+                let newPlayers = JSON.parse(JSON.stringify(state.players));
+                newPlayers[uid].clicks += amt;
+                
+                await this.updateState({ ...state, players: newPlayers });
+            },
+
+            // --- VOTING ---
+            async voting_vote(targetId, overrideUid = null) {
+                const uid = overrideUid || user.uid;
+                let state = localState.gameState.minigameState;
+                
+                if(localState.gameState.phase !== 'playing' || state.phase !== 'voting') return;
+                if(!state.votes || state.votes[uid] !== null) return;
+                
+                let newVotes = { ...state.votes };
+                newVotes[uid] = targetId;
+                
+                let updateData = { ...state, votes: newVotes };
+                
+                const totalVoters = Object.keys(newVotes).length;
+                const casted = Object.values(newVotes).filter(v => v !== null).length;
+                
+                if(casted >= totalVoters) {
+                    updateData.phase = 'result';
+                }
+                
+                await this.updateState(updateData);
+            },
+
+            // --- BOMB ---
+            async bomb_pass(overrideUid = null) {
+                const uid = overrideUid || user.uid;
+                let state = localState.gameState.minigameState;
+                if(localState.gameState.phase !== 'playing' || state.phase !== 'playing') return;
+                
+                const pIds = localState.gameState.selectedPlayers;
+                if(pIds[state.holderIndex] !== uid) return;
+                
+                let nextIdx = (state.holderIndex + 1) % pIds.length;
+                await this.updateState({ ...state, holderIndex: nextIdx });
+            },
+
+            // --- SEQUENCE ---
+            async sequence_click(index, overrideUid = null) {
+                const uid = overrideUid || user.uid;
+                let state = localState.gameState.minigameState;
+                const pIds = localState.gameState.selectedPlayers;
+                
+                if (localState.gameState.phase !== 'playing' || state.phase !== 'playing') return;
+                if (pIds[state.turnIndex] !== uid) return;
+                
+                const clickedNum = state.sequence[index];
+                const targetNum = state.progress + 1;
+
+                // Salva che questo numero è stato visto (aiuta i BOT)
+                let newKnown = state.known || [];
+                if (!newKnown.includes(clickedNum)) newKnown.push(clickedNum);
+
+                if (clickedNum === targetNum) {
+                    // Corretto!
+                    audioEngine.playCorrect(state.progress);
+                    let newState = { ...state, progress: state.progress + 1, known: newKnown };
                     
-                    let maxRoll = -1; let roundWinner = null; let tie = false;
-                    nominees.forEach(n => {
-                        if(mgData.currentRolls[n] > maxRoll) { maxRoll = mgData.currentRolls[n]; roundWinner = n; tie = false;}
-                        else if(mgData.currentRolls[n] === maxRoll) { tie = true; }
-                    });
+                    if (newState.progress === 7) {
+                        // Ha completato la sequenza! È salvo.
+                        audioEngine.playWin();
+                        newState.winners = [...state.winners, uid];
+                        
+                        // Controllo vittoria/eliminazione
+                        if (pIds.length - newState.winners.length <= 1) {
+                            // C'è solo 1 perdente rimasto!
+                            const loser = pIds.find(id => !newState.winners.includes(id));
+                            if (isHost) setTimeout(() => hostEngine.resolveGame([loser]), 1000);
+                            newState.phase = 'won';
+                        } else {
+                            // C'è ancora più di un giocatore a rischio (caso 3 giocatori originali). Resetta e continua
+                            newState.sequence = ui.shuffle([1,2,3,4,5,6,7]);
+                            newState.colors = ui.shuffle(['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899']);
+                            newState.progress = 0;
+                            // Salta i vincitori per il prossimo turno
+                            let nextTurn = (state.turnIndex + 1) % pIds.length;
+                            while(newState.winners.includes(pIds[nextTurn])) {
+                                nextTurn = (nextTurn + 1) % pIds.length;
+                            }
+                            newState.turnIndex = nextTurn;
+                        }
+                    }
+                    await this.updateState(newState);
+                } else {
+                    // Sbagliato!
+                    audioEngine.playWrong();
+                    await this.updateState({ ...state, phase: 'showing_error', errorIndex: index, errorTime: Date.now(), known: newKnown });
+                }
+            },
+
+            // --- CHAT ---
+            async send_chat() {
+                const input = document.getElementById('input-chat');
+                if(!input || !input.value.trim() || !user || !localState) return;
+                
+                const text = input.value.trim().substring(0, 100);
+                input.value = '';
+                
+                const myPlayer = localState.players.find(p => p.uid === user.uid);
+                const name = myPlayer ? myPlayer.name : 'Spettatore';
+                
+                let newMessages = [...(localState.messages || []), { uid: user.uid, name, text }];
+                if(newMessages.length > 50) newMessages = newMessages.slice(-50); // Mantiene solo gli ultimi 50
+                
+                await updateDoc(logic.getRoomDoc(currentRoomId), { messages: newMessages });
+            },
+
+            // --- MUSIC (HOST DJ) ---
+            async set_music() {
+                if(!isHost) return;
+                const input = document.getElementById('input-youtube').value.trim();
+                if(!input) return;
+                
+                // Estrae l'ID del video di YouTube tramite Regex
+                const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+                const match = input.match(regExp);
+                const musicId = (match && match[2].length === 11) ? match[2] : null;
+                
+                if(musicId) {
+                    await updateDoc(logic.getRoomDoc(currentRoomId), { musicId });
+                    document.getElementById('input-youtube').value = '';
+                    ui.notify("Traccia inviata a tutti i giocatori!");
+                } else {
+                    ui.notify("URL YouTube non valido", "error");
+                }
+            },
+            
+            async stop_music() {
+                if(!isHost) return;
+                await updateDoc(logic.getRoomDoc(currentRoomId), { musicId: null });
+            }
+        };
+        window.actions = actions;
+
+        // ==========================================
+        // NPC ENGINE (Host only)
+        // ==========================================
+        const npcEngine = {
+            tick(state, oldState) {
+                if(!isHost || state.gameState.phase !== 'playing') return;
+                
+                // Clear old intervals
+                npcLogicIntervals.forEach(clearInterval);
+                npcLogicIntervals = [];
+
+                const gm = state.gameState;
+                
+                // --- HOST CENTRALIZED RESOLUTIONS ---
+                // 1. Dadi (DICE)
+                if (gm.currentMinigame === 'dice' && gm.minigameState.phase === 'showing') {
+                    if (!oldState.gameState.minigameState || oldState.gameState.minigameState.phase !== 'showing') {
+                        setTimeout(async () => {
+                            let s = localState.gameState.minigameState;
+                            if(localState.gameState.phase !== 'playing' || s.phase !== 'showing') return;
+                            
+                            let lowestRoll = 999;
+                            let losers = [];
+                            for(const [pId, data] of Object.entries(s.players)) {
+                                if(data.roll !== null && data.roll < lowestRoll) { lowestRoll = data.roll; losers = [pId]; }
+                                else if(data.roll !== null && data.roll === lowestRoll) { losers.push(pId); } 
+                            }
+                            
+                            let isGameOver = false;
+                            let eliminated = [];
+                            let newPlayers = JSON.parse(JSON.stringify(s.players));
+                            
+                            for(let id of losers) {
+                                newPlayers[id].lives--;
+                                await actions.recordStatLoss(id);
+                                if(newPlayers[id].lives <= 0) { isGameOver = true; eliminated.push(id); }
+                            }
+
+                            if(isGameOver) {
+                                hostEngine.resolveGame(eliminated);
+                            } else {
+                                // Reset rolls per prossimo round
+                                for(let key in newPlayers) newPlayers[key].roll = null;
+                                actions.updateState({...s, players: newPlayers, phase: 'rolling'});
+                            }
+                        }, 2500);
+                    }
+                    return; // Blocca i bot dal fare altre mosse mentre si calcolano i risultati
+                }
+
+                // 2. Voting
+                if (gm.currentMinigame === 'voting' && gm.minigameState.phase === 'result') {
+                    if (!oldState.gameState.minigameState || oldState.gameState.minigameState.phase !== 'result') {
+                        setTimeout(() => {
+                            let s = localState.gameState.minigameState;
+                            if(localState.gameState.phase !== 'playing' || s.phase !== 'result') return;
+                            
+                            let counts = {};
+                            localState.gameState.selectedPlayers.forEach(id => counts[id] = 0);
+                            Object.values(s.votes).forEach(v => {
+                                if(v !== null && counts.hasOwnProperty(v)) counts[v]++;
+                            });
+                            
+                            let maxVotes = -1;
+                            let eliminated = [];
+                            for(let [id, count] of Object.entries(counts)) {
+                                if(count > maxVotes) { maxVotes = count; eliminated = [id]; }
+                                else if(count === maxVotes) { eliminated.push(id); }
+                            }
+                            
+                            // Pareggio? Random tra i pareggiati
+                            if(eliminated.length > 1) {
+                                eliminated = [eliminated[Math.floor(Math.random() * eliminated.length)]];
+                            }
+                            
+                            hostEngine.resolveGame(eliminated);
+                        }, 3500);
+                    }
+                    return;
+                }
+
+                // 3. Bomba (BOMB) Timer check
+                if (gm.currentMinigame === 'bomb' && gm.minigameState.phase === 'playing') {
+                    if (Date.now() >= gm.minigameState.endTime) {
+                        // Esplosione!
+                        const loserId = gm.selectedPlayers[gm.minigameState.holderIndex];
+                        actions.updateState({ ...gm.minigameState, phase: 'exploded' });
+                        audioEngine.playExplosion();
+                        
+                        setTimeout(() => {
+                            hostEngine.resolveGame([loserId]);
+                        }, 2000);
+                        return; // Ferma tutto
+                    }
+                }
+
+                // 4. Ordine Numerico (SEQUENCE) Error Reset
+                if (gm.currentMinigame === 'sequence' && gm.minigameState.phase === 'showing_error') {
+                    // Aspetta 1.5 secondi per far memorizzare l'errore a tutti, poi cambia turno
+                    if (Date.now() - gm.minigameState.errorTime >= 1500) {
+                        let s = gm.minigameState;
+                        let nextTurn = (s.turnIndex + 1) % gm.selectedPlayers.length;
+                        while(s.winners.includes(gm.selectedPlayers[nextTurn])) {
+                            nextTurn = (nextTurn + 1) % gm.selectedPlayers.length;
+                        }
+                        actions.updateState({ ...s, phase: 'playing', errorIndex: null, progress: 0, turnIndex: nextTurn });
+                    }
+                    return; // Durante l'errore nessuno agisce
+                }
+
+                const minigame = minigamesEngine.games[gm.currentMinigame];
+                if(!minigame || !minigame.npcTurn) return;
+
+                // Logica generale: se tocca a un NPC, o se tutti gli NPC possono agire, chiama npcTurn
+                const pIds = gm.selectedPlayers;
+                
+                // Giochi a turni (Tiles, Sequence)
+                if(gm.minigameState.turnIndex !== undefined) {
+                    let turnIdx = gm.minigameState.turnIndex;
+                    let activeUid = pIds[turnIdx];
+                    let p = state.players.find(x => x.uid === activeUid);
                     
-                    if(!tie && roundWinner) mgData.scores[roundWinner]++;
-                    mgData.currentRolls = {};
-                    mgData.resolving = false;
-                    await updateDoc(doc(getPlayerPath(), currentRoomId), { [`phaseData.minigameData`]: mgData });
-                    
-                    // End Dice Check
-                    for(let n of nominees) {
-                        if(mgData.scores[n] >= 3) {
-                            // Find loser (not the winner). In 3 players this logic needs tweak, but assuming 2 mostly.
-                            let loser = nominees.find(x => x !== n); 
-                            await delay(2000);
-                            await eliminatePlayer(loser);
-                            return;
+                    if(p && p.isNpc) {
+                        // Evita chiamate multiple per lo stesso stato
+                        if(JSON.stringify(state.gameState) !== JSON.stringify(oldState.gameState)) {
+                            setTimeout(() => minigame.npcTurn(gm.minigameState, pIds, activeUid), 1000 + Math.random()*1000);
                         }
                     }
                 }
-            }
-        }
+                // Giochi simultanei
+                else {
+                    let pNpcs = state.players.filter(x => pIds.includes(x.uid) && x.isNpc);
+                    
+                    // Specifico per Voting (dove votano i non selezionati)
+                    if(gm.currentMinigame === 'voting') {
+                        pNpcs = state.players.filter(x => x.isAlive && !pIds.includes(x.uid) && x.isNpc);
+                    }
 
-        async function eliminatePlayer(loserId) {
-            // Update rank
-            const activeCount = getActivePlayers().length;
-            const loserObj = roomData.players[loserId];
-            loserObj.isEliminated = true;
-            loserObj.rank = activeCount;
-            
-            const newRanking = [...(roomData.ranking||[])];
-            newRanking.unshift(loserObj); // Add to front so rank 1 is last pushed
-            
-            let updates = {
-                [`players.${loserId}.isEliminated`]: true,
-                [`players.${loserId}.rank`]: activeCount,
-                ranking: newRanking,
-                currentRound: roomData.currentRound + 1
-            };
+                    pNpcs.forEach(npc => {
+                        // Per Mash serve un intervallo
+                        if(gm.currentMinigame === 'mash') {
+                            const id = setInterval(() => minigame.npcTurn(gm.minigameState, pIds, npc.uid), 500);
+                            npcLogicIntervals.push(id);
+                        } else {
+                            if(JSON.stringify(state.gameState) !== JSON.stringify(oldState.gameState)) {
+                                setTimeout(() => minigame.npcTurn(gm.minigameState, pIds, npc.uid), 500 + Math.random()*2000);
+                            }
+                        }
+                    });
 
-            // Check Endgame
-            if (activeCount - 1 === 1) {
-                // Winner!
-                const winnerId = getActivePlayers().find(p => p.id !== loserId).id;
-                const winnerObj = roomData.players[winnerId];
-                winnerObj.rank = 1;
-                newRanking.unshift(winnerObj);
-                updates.ranking = newRanking;
-                updates.status = 'ended';
-            } 
-            else if (activeCount - 1 === 2) {
-                updates.status = 'finale';
-                // setup finale config... simplify to just ended for token limit if needed, but requested Best of 3.
-                // Best of 3 is complex, let's just trigger ended to guarantee stability of core loop.
-                // *Self correction: Prompt asked for Finale Best of 3.* // Let's implement a simple direct final decision to save tokens and avoid nested minigame spaghetti.
-                // Wait, I will just set status to ended and calculate winner randomly if I run out of code. Let's do a simple Dice BO3 for Finale.
-                updates.status = 'elimination_challenge';
-                const finalists = getActivePlayers().filter(p=>p.id!==loserId).map(p=>p.id);
-                updates.phaseData = {
-                    minigameType: 'dice',
-                    nominees: finalists,
-                    minigameData: { turn: finalists[0], turnIndex: 0, scores: {}, currentRolls: {} }
-                };
-                finalists.forEach(f => updates.phaseData.minigameData.scores[f] = 0);
-            }
-            else {
-                // Return to Social
-                updates.status = 'social';
-                updates.phaseData = { actionsDone: [] };
-            }
+                    // Logica di fine tempo per Mash (Host chiude il round)
+                    if(gm.currentMinigame === 'mash' && !window.mashHostChecker) {
+                        window.mashHostChecker = setInterval(() => {
+                            if(localState.gameState.currentMinigame !== 'mash') { clearInterval(window.mashHostChecker); window.mashHostChecker=null; return; }
+                            
+                            if(Date.now() >= localState.gameState.minigameState.endTime && localState.gameState.minigameState.phase === 'playing') {
+                                clearInterval(window.mashHostChecker); window.mashHostChecker=null;
+                                
+                                actions.updateState({...localState.gameState.minigameState, phase: 'ended'});
+                                
+                                // Calcola chi ha perso
+                                let s = localState.gameState.minigameState;
+                                let lowest = 999999;
+                                let losers = [];
+                                for(const [uid, data] of Object.entries(s.players)) {
+                                    if(data.clicks < lowest) { lowest = data.clicks; losers = [uid]; }
+                                    else if(data.clicks === lowest) losers.push(uid);
+                                }
+                                
+                                // Random tie breaker se tutti hanno stesso punteggio basso
+                                if(losers.length > 1) losers = [losers[Math.floor(Math.random()*losers.length)]];
+                                
+                                let newPlayers = {...s.players};
+                                let isGameOver = false;
+                                let elim = [];
+                                
+                                losers.forEach(id => {
+                                    newPlayers[id].lives--;
+                                    actions.recordStatLoss(id);
+                                    if(newPlayers[id].lives <= 0) { isGameOver = true; elim.push(id); }
+                                });
 
-            await updateDoc(doc(getPlayerPath(), currentRoomId), updates);
-        }
+                                if(isGameOver) hostEngine.resolveGame(elim);
+                                else {
+                                    // Reset round mash
+                                    for(let k in newPlayers) newPlayers[k].clicks = 0;
+                                    actions.updateState({...s, players: newPlayers, phase: 'playing', endTime: Date.now() + 10000});
+                                }
+                            }
+                        }, 500);
+                    }
+                }
+            }
+        };
+
+        // ==========================================
+        // INIT
+        // ==========================================
+        window.onload = () => {
+            logic.initAuth();
+            ui.showScreen('menu');
+        };
 
     </script>
 </body>
