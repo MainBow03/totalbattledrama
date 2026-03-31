@@ -395,7 +395,15 @@
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'elimination-party-v1';
         
         try {
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { /* Fallback conf for local test removed */ };
+            const firebaseConfig = {
+  apiKey: "AIzaSyBSZczSM2hv9gcmcOKSD6ICFROF5xcFmTE",
+  authDomain: "totalbattledrama.firebaseapp.com",
+  projectId: "totalbattledrama",
+  storageBucket: "totalbattledrama.firebasestorage.app",
+  messagingSenderId: "550715197163",
+  appId: "1:550715197163:web:ef4181ae302ccb6a9060ae",
+  measurementId: "G-KFFR9ZT0C4"
+};
             app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
