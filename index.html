@@ -993,7 +993,7 @@
                 // Scegli gioco casuale compatibile col numero di giocatori
                 let availableGames = MINIGAMES;
                 if(selectedIds.length === 3) {
-                    availableGames = ['tiles', 'memory', 'dice', 'voting', 'maze', 'reaction', 'mash', 'wheel'];
+                    availableGames = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence'];
                 }
                 
                 const gameName = availableGames[Math.floor(Math.random() * availableGames.length)];
@@ -1009,6 +1009,8 @@
             },
 
             async resolveGame(loserIds) {
+                if(localState.gameState.phase === 'resolving') return; // Guardia contro esecuzioni multiple
+
                 // loserIds è un array.
                 let updatedPlayers = [...localState.players];
                 let eliminations = [];
@@ -1016,17 +1018,19 @@
 
                 loserIds.forEach(uid => {
                     let p = updatedPlayers.find(x => x.uid === uid);
-                    p.isAlive = false;
-                    p.stats.order = aliveCount; // L'ordine di eliminazione è basato su quanti erano vivi (più alto = migliore)
-                    aliveCount--;
-                    eliminations.push(uid);
+                    if (p) {
+                        p.isAlive = false;
+                        p.stats.order = aliveCount; // L'ordine di eliminazione è basato su quanti erano vivi (più alto = migliore)
+                        aliveCount--;
+                        eliminations.push(uid);
+                    }
                 });
 
                 // Update win stats per chi era selezionato ma non ha perso
                 localState.gameState.selectedPlayers.forEach(uid => {
                     if(!loserIds.includes(uid)) {
                         let p = updatedPlayers.find(x => x.uid === uid);
-                        p.stats.wins++;
+                        if (p) p.stats.wins++;
                     }
                 });
 
@@ -1195,7 +1199,6 @@
                     }
                 },
 
-                // GIOCHI SEMPLIFICATI PER SPAZIO E STABILITÀ
                 mash: {
                     title: "Button Mash",
                     desc: "Clicca più veloce che puoi in 10 secondi! Chi fa meno click perde 1 vita.",
@@ -1213,7 +1216,7 @@
                             <div class="flex flex-col items-center">
                                 <div class="text-6xl font-black text-yellow-400 mb-8">${timeLeft}s</div>
                                 ${state.phase === 'playing' && pIds.includes(user.uid) ? 
-                                `<button onclick="actions.mash_click()" class="bg-purple-600 hover:bg-purple-500 active:bg-purple-800 w-48 h-48 rounded-full text-3xl font-bold shadow-[0_10px_0_#4c1d95] active:translate-y-2 active:shadow-none transition-all">MASH!</button>`
+                                `<button onclick="actions.mash_click()" class="bg-purple-600 hover:bg-purple-500 active:bg-purple-800 w-48 h-48 rounded-full text-3xl font-bold shadow-[0_10px_0_#4c1d95] active:translate-y-2 active:scale-95 active:shadow-none transition-all">MASH!</button>`
                                 : '<div class="text-slate-500 text-xl">Spettatore</div>'}
                             </div>
                         `;
@@ -1228,7 +1231,8 @@
                     npcTurn(state, pIds, currentUid) {
                         // Gli NPC cliccano "virtualmente" inviando un burst di click
                         if(state.phase === 'playing' && Math.random() > 0.5) {
-                            actions.mash_click(currentUid, Math.floor(Math.random() * 3) + 1); // 1-3 click in un batch
+                            // Cliccano in modo competitivo: da 2 a 5 click ogni mezzo secondo (quindi da 4 a 10 click al secondo)
+                            actions.mash_click(currentUid, Math.floor(Math.random() * 4) + 2);
                         }
                     }
                 },
@@ -1518,9 +1522,13 @@
                     newPlayers[uid].points++;
                     
                     if(newPlayers[uid].points >= 3) {
-                        // Vince lui, perdono gli altri
-                        const losers = localState.gameState.selectedPlayers.filter(id => id !== uid);
-                        hostEngine.resolveGame(losers);
+                        // Segna il round come finito a livello di stato, l'Host lo risolverà
+                        await this.updateState({
+                            ...state,
+                            players: newPlayers,
+                            status: 'finished',
+                            winner: uid
+                        });
                     } else {
                         // Nuovo round reaction
                         await this.updateState({
@@ -1611,7 +1619,7 @@
                         if (pIds.length - newState.winners.length <= 1) {
                             // C'è solo 1 perdente rimasto!
                             const loser = pIds.find(id => !newState.winners.includes(id));
-                            if (isHost) setTimeout(() => hostEngine.resolveGame([loser]), 1000);
+                            setTimeout(() => hostEngine.resolveGame([loser]), 1000);
                             newState.phase = 'won';
                         } else {
                             // C'è ancora più di un giocatore a rischio (caso 3 giocatori originali). Resetta e continua
@@ -1691,6 +1699,7 @@
                 const gm = state.gameState;
                 
                 // --- HOST CENTRALIZED RESOLUTIONS ---
+                
                 // 1. Dadi (DICE)
                 if (gm.currentMinigame === 'dice' && gm.minigameState.phase === 'showing') {
                     if (!oldState.gameState.minigameState || oldState.gameState.minigameState.phase !== 'showing') {
@@ -1716,11 +1725,11 @@
                             }
 
                             if(isGameOver) {
-                                hostEngine.resolveGame(eliminated);
+                                await hostEngine.resolveGame(eliminated);
                             } else {
                                 // Reset rolls per prossimo round
                                 for(let key in newPlayers) newPlayers[key].roll = null;
-                                actions.updateState({...s, players: newPlayers, phase: 'rolling'});
+                                await actions.updateState({...s, players: newPlayers, phase: 'rolling'});
                             }
                         }, 2500);
                     }
@@ -1730,7 +1739,7 @@
                 // 2. Voting
                 if (gm.currentMinigame === 'voting' && gm.minigameState.phase === 'result') {
                     if (!oldState.gameState.minigameState || oldState.gameState.minigameState.phase !== 'result') {
-                        setTimeout(() => {
+                        setTimeout(async () => {
                             let s = localState.gameState.minigameState;
                             if(localState.gameState.phase !== 'playing' || s.phase !== 'result') return;
                             
@@ -1752,7 +1761,7 @@
                                 eliminated = [eliminated[Math.floor(Math.random() * eliminated.length)]];
                             }
                             
-                            hostEngine.resolveGame(eliminated);
+                            await hostEngine.resolveGame(eliminated);
                         }, 3500);
                     }
                     return;
@@ -1785,6 +1794,17 @@
                         actions.updateState({ ...s, phase: 'playing', errorIndex: null, progress: 0, turnIndex: nextTurn });
                     }
                     return; // Durante l'errore nessuno agisce
+                }
+
+                // 5. Reaction
+                if (gm.currentMinigame === 'reaction' && gm.minigameState.status === 'finished') {
+                    if (!oldState.gameState.minigameState || oldState.gameState.minigameState.status !== 'finished') {
+                        setTimeout(() => {
+                            const losers = gm.selectedPlayers.filter(id => id !== gm.minigameState.winner);
+                            hostEngine.resolveGame(losers);
+                        }, 1000);
+                    }
+                    return;
                 }
 
                 const minigame = minigamesEngine.games[gm.currentMinigame];
@@ -1851,15 +1871,19 @@
                         }
                     });
 
-                    // Logica di fine tempo per Mash (Host chiude il round)
+                    // Logica di fine tempo per Mash (Host chiude il round) in modalità sicura Asincrona
                     if(gm.currentMinigame === 'mash' && !window.mashHostChecker) {
-                        window.mashHostChecker = setInterval(() => {
-                            if(localState.gameState.currentMinigame !== 'mash') { clearInterval(window.mashHostChecker); window.mashHostChecker=null; return; }
+                        window.mashHostChecker = setInterval(async () => {
+                            if(localState.gameState.currentMinigame !== 'mash') { 
+                                clearInterval(window.mashHostChecker); window.mashHostChecker=null; 
+                                return; 
+                            }
                             
                             if(Date.now() >= localState.gameState.minigameState.endTime && localState.gameState.minigameState.phase === 'playing') {
                                 clearInterval(window.mashHostChecker); window.mashHostChecker=null;
                                 
-                                actions.updateState({...localState.gameState.minigameState, phase: 'ended'});
+                                // Impedisci esecuzioni multiple
+                                localState.gameState.minigameState.phase = 'ended';
                                 
                                 // Calcola chi ha perso
                                 let s = localState.gameState.minigameState;
@@ -1873,21 +1897,23 @@
                                 // Random tie breaker se tutti hanno stesso punteggio basso
                                 if(losers.length > 1) losers = [losers[Math.floor(Math.random()*losers.length)]];
                                 
-                                let newPlayers = {...s.players};
+                                let newPlayers = JSON.parse(JSON.stringify(s.players));
                                 let isGameOver = false;
                                 let elim = [];
                                 
-                                losers.forEach(id => {
+                                // Esegue le perdite in modo sequenziale per non infastidire il database
+                                for (let id of losers) {
                                     newPlayers[id].lives--;
-                                    actions.recordStatLoss(id);
+                                    await actions.recordStatLoss(id);
                                     if(newPlayers[id].lives <= 0) { isGameOver = true; elim.push(id); }
-                                });
+                                }
 
-                                if(isGameOver) hostEngine.resolveGame(elim);
-                                else {
+                                if(isGameOver) {
+                                    await hostEngine.resolveGame(elim);
+                                } else {
                                     // Reset round mash
                                     for(let k in newPlayers) newPlayers[k].clicks = 0;
-                                    actions.updateState({...s, players: newPlayers, phase: 'playing', endTime: Date.now() + 10000});
+                                    await actions.updateState({...s, players: newPlayers, phase: 'playing', endTime: Date.now() + 10000});
                                 }
                             }
                         }, 500);
