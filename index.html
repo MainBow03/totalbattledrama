@@ -304,22 +304,23 @@
         // --- INIZIO BLOCCO DA SOSTITUIRE SU GITHUB PAGES ---
         // Se esegui su Github Pages, cancella il blocco sotto e usa la TUA config che mi hai dato nel prompt.
         let firebaseConfig;
-        let appId = 'tbd-default-app';
-        try {
-            firebaseConfig = JSON.parse(__firebase_config);
-            appId = typeof __app_id !== 'undefined' ? __app_id : appId;
-        } catch (e) {
-            console.warn("Utilizzo configurazione di fallback. Su Github Pages devi inserire qui la tua config.");
-            // INSERISCI QUI LA TUA CONFIG PER GITHUB PAGES:
-            const firebaseConfig = {
-  apiKey: "AIzaSyBSZczSM2hv9gcmcOKSD6ICFROF5xcFmTE",
-  authDomain: "totalbattledrama.firebaseapp.com",
-  projectId: "totalbattledrama",
-  storageBucket: "totalbattledrama.firebasestorage.app",
-  messagingSenderId: "550715197163",
-  appId: "1:550715197163:web:ef4181ae302ccb6a9060ae",
-  measurementId: "G-KFFR9ZT0C4"
-};
+let appId = 'torneo-100-v5'; // Oppure il nome che preferisci
+
+try {
+    // Prova a leggere la configurazione automatica del Canvas
+    firebaseConfig = JSON.parse(__firebase_config);
+    appId = typeof __app_id !== 'undefined' ? __app_id : appId;
+} catch (e) {
+    // Se non esiste (sei su GitHub), usa i tuoi dati reali
+    firebaseConfig = {
+        apiKey: "AIzaSyBSZczSM2hv9gcmcOKSD6ICFROF5xcFmTE",
+        authDomain: "totalbattledrama.firebaseapp.com",
+        projectId: "totalbattledrama",
+        storageBucket: "totalbattledrama.firebasestorage.app",
+        messagingSenderId: "550715197163",
+        appId: "1:550715197163:web:ef4181ae302ccb6a9060ae",
+        measurementId: "G-KFFR9ZT0C4"
+    };
         }
         // --- FINE BLOCCO DA SOSTITUIRE SU GITHUB PAGES ---
 
