@@ -278,6 +278,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
 
         // ==========================================
         // COSTANTI E DATI
@@ -391,26 +392,26 @@
         // ==========================================
         // FIREBASE SETUP (STRICT RULES APPLIED)
         // ==========================================
-        let app, auth, db, user;
+        let app, auth, db, user, analytics;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'elimination-party-v1';
         
         try {
-            const firebaseConfig = {
-  apiKey: "AIzaSyBSZczSM2hv9gcmcOKSD6ICFROF5xcFmTE",
-  authDomain: "totalbattledrama.firebaseapp.com",
-  projectId: "totalbattledrama",
-  storageBucket: "totalbattledrama.firebasestorage.app",
-  messagingSenderId: "550715197163",
-  appId: "1:550715197163:web:ef4181ae302ccb6a9060ae",
-  measurementId: "G-KFFR9ZT0C4"
-};
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+                apiKey: "AIzaSyBSZczSM2hv9gcmcOKSD6ICFROF5xcFmTE",
+                authDomain: "totalbattledrama.firebaseapp.com",
+                projectId: "totalbattledrama",
+                storageBucket: "totalbattledrama.firebasestorage.app",
+                messagingSenderId: "550715197163",
+                appId: "1:550715197163:web:ef4181ae302ccb6a9060ae",
+                measurementId: "G-KFFR9ZT0C4"
+            };
             app = initializeApp(firebaseConfig);
+            analytics = getAnalytics(app);
             auth = getAuth(app);
             db = getFirestore(app);
         } catch (e) {
-            console.error("Firebase init error (expected in isolated preview without config):", e);
-            // Fallback gracefully per l'ambiente di anteprima
-            document.getElementById('screen-menu').innerHTML = `<div class="p-8 text-center text-red-500 bg-slate-800 rounded">Errore Inizializzazione Firebase. L'app richiede l'ambiente corretto con __firebase_config.</div>`;
+            console.error("Firebase init error:", e);
+            document.getElementById('screen-menu').innerHTML = `<div class="p-8 text-center text-red-500 bg-slate-800 rounded">Errore Inizializzazione Firebase.</div>`;
         }
 
         let unsubscribeRoom = null;
@@ -1075,7 +1076,12 @@
                         const turnUid = pIds[state.turnIndex];
                         const turnPlayer = localState.players.find(p => p.uid === turnUid);
                         
-                        document.getElementById('minigame-desc').innerHTML = `Turno di: <strong class="${isMyTurn ? 'text-green-400' : 'text-blue-400'}">${turnPlayer.name}</strong>`;
+                        document.getElementById('minigame-desc').innerHTML = `
+                            <div class="flex items-center justify-center gap-2">
+                                Turno di: 
+                                <img src="${ui.getChar(turnPlayer.charId).url}" class="w-8 h-8 rounded-full object-cover border-2 ${isMyTurn ? 'border-green-400' : 'border-blue-400'}">
+                                <strong class="${isMyTurn ? 'text-green-400' : 'text-blue-400'}">${turnPlayer.name}</strong>
+                            </div>`;
                         
                         // HUD Vite
                         this.renderHUD(state.players, pIds, isMyTurn ? turnUid : null);
@@ -1294,7 +1300,11 @@
                                 <div class="text-8xl mb-8 ${state.phase === 'playing' ? 'animate-pulse' : 'scale-150 transition-transform'}">
                                     ${state.phase === 'playing' ? '💣' : '💥'}
                                 </div>
-                                <h3 class="text-xl mb-4 text-center">In mano a: <strong class="text-yellow-400">${holder.name}</strong></h3>
+                                <h3 class="text-xl mb-4 text-center flex items-center gap-3 justify-center">
+                                    In mano a: 
+                                    <img src="${ui.getChar(holder.charId).url}" class="w-10 h-10 rounded-full object-cover border-2 border-yellow-400">
+                                    <strong class="text-yellow-400">${holder.name}</strong>
+                                </h3>
                                 ${isMyTurn ? `<button onclick="actions.bomb_pass()" class="bg-red-600 hover:bg-red-500 text-white font-black py-4 px-12 rounded-full text-2xl shadow-[0_0_20px_#ef4444]">PASSA!</button>` : ''}
                             </div>
                         `;
@@ -1336,7 +1346,11 @@
 
                         let html = `
                             <div class="w-full flex flex-col items-center">
-                                <div class="mb-4 text-lg">Turno di: <strong class="text-blue-400">${activePlayer.name}</strong></div>
+                                <div class="mb-4 text-lg flex items-center gap-2 justify-center">
+                                    Turno di: 
+                                    <img src="${ui.getChar(activePlayer.charId).url}" class="w-8 h-8 rounded-full object-cover border-2 border-blue-400">
+                                    <strong class="text-blue-400">${activePlayer.name}</strong>
+                                </div>
                                 <div class="mb-6 text-xl text-yellow-300 font-bold">Prossimo numero da trovare: ${state.progress + 1}</div>
                                 <div class="flex gap-4 flex-wrap justify-center max-w-lg">
                         `;
@@ -1405,13 +1419,16 @@
                 const hud = document.getElementById('minigame-players-hud');
                 if(!hud) return;
                 hud.innerHTML = pIds.map(uid => {
-                    const p = localState.players.find(x => x.uid === uid) || { name: 'Sconosciuto' };
+                    const p = localState.players.find(x => x.uid === uid) || { name: 'Sconosciuto', charId: CHARACTERS[0].id };
                     const stats = (playersState && playersState[uid]) ? playersState[uid] : {};
                     const val = stats[statName] || 0;
+                    const charData = ui.getChar(p.charId);
+                    const imgUrl = charData ? charData.url : '';
                     return `
-                        <div class="flex flex-col items-center bg-slate-900 px-6 py-2 rounded-lg border ${uid === highlightUid ? 'border-green-500 shadow-[0_0_10px_#10b981]' : 'border-slate-700'}">
-                            <span class="text-xs text-slate-400 mb-1">${p.name}</span>
-                            <div class="flex gap-1">${String(statIcon).repeat(Math.max(0, val))}</div>
+                        <div class="flex flex-col items-center bg-slate-900 px-4 py-3 rounded-lg border ${uid === highlightUid ? 'border-green-500 shadow-[0_0_10px_#10b981] scale-105 transition-transform' : 'border-slate-700'} relative">
+                            <img src="${imgUrl}" class="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover mb-2 border-2 ${uid === highlightUid ? 'border-green-500' : 'border-slate-600'}">
+                            <span class="text-xs font-bold text-white mb-1">${p.name}</span>
+                            <div class="flex gap-1 text-sm md:text-base">${String(statIcon).repeat(Math.max(0, val))}</div>
                         </div>
                     `;
                 }).join('');
@@ -1668,9 +1685,8 @@
             tick(state, oldState) {
                 if(!isHost || state.gameState.phase !== 'playing') return;
                 
-                // Clear old intervals
-                npcLogicIntervals.forEach(clearInterval);
-                npcLogicIntervals = [];
+                // Track actions to prevent duplicate firing due to firebase snapshot spam
+                if (!window.npcActionHashes) window.npcActionHashes = {};
 
                 const gm = state.gameState;
                 
@@ -1784,9 +1800,17 @@
                     let p = state.players.find(x => x.uid === activeUid);
                     
                     if(p && p.isNpc) {
-                        // Evita chiamate multiple per lo stesso stato
-                        if(JSON.stringify(state.gameState) !== JSON.stringify(oldState.gameState)) {
-                            setTimeout(() => minigame.npcTurn(gm.minigameState, pIds, activeUid), 1000 + Math.random()*1000);
+                        // Crea un hash univoco per questo esatto stato del turno
+                        let stateHash = gm.currentMinigame + "_" + gm.round + "_" + turnIdx + "_" + (gm.minigameState.progress || 0) + "_" + (gm.minigameState.errorIndex !== null ? gm.minigameState.errorIndex : 'none');
+                        
+                        if (window.npcActionHashes['turn'] !== stateHash) {
+                            window.npcActionHashes['turn'] = stateHash;
+                            setTimeout(() => {
+                                // Verifica che sia ancora il suo turno e che il gioco stia andando
+                                if (localState.gameState.phase === 'playing' && localState.gameState.minigameState.turnIndex === turnIdx) {
+                                    minigame.npcTurn(localState.gameState.minigameState, pIds, activeUid);
+                                }
+                            }, 1000 + Math.random()*1500);
                         }
                     }
                 }
@@ -1800,13 +1824,29 @@
                     }
 
                     pNpcs.forEach(npc => {
-                        // Per Mash serve un intervallo
                         if(gm.currentMinigame === 'mash') {
-                            const id = setInterval(() => minigame.npcTurn(gm.minigameState, pIds, npc.uid), 500);
-                            npcLogicIntervals.push(id);
+                            let mashHash = gm.round + "_mash";
+                            if (window.npcActionHashes['mash_' + npc.uid] !== mashHash) {
+                                window.npcActionHashes['mash_' + npc.uid] = mashHash;
+                                const id = setInterval(() => {
+                                    if (localState.gameState.currentMinigame === 'mash' && localState.gameState.minigameState.phase === 'playing') {
+                                        minigame.npcTurn(localState.gameState.minigameState, pIds, npc.uid);
+                                    } else {
+                                        clearInterval(id);
+                                    }
+                                }, 500);
+                                npcLogicIntervals.push(id);
+                            }
                         } else {
-                            if(JSON.stringify(state.gameState) !== JSON.stringify(oldState.gameState)) {
-                                setTimeout(() => minigame.npcTurn(gm.minigameState, pIds, npc.uid), 500 + Math.random()*2000);
+                            let actionHash = gm.currentMinigame + "_" + gm.round + "_" + gm.minigameState.phase + "_" + (gm.minigameState.status || '') + "_" + (gm.minigameState.holderIndex !== undefined ? gm.minigameState.holderIndex : '');
+                            
+                            if (window.npcActionHashes[npc.uid] !== actionHash) {
+                                window.npcActionHashes[npc.uid] = actionHash;
+                                setTimeout(() => {
+                                    if (localState.gameState.phase === 'playing') {
+                                        minigame.npcTurn(localState.gameState.minigameState, pIds, npc.uid);
+                                    }
+                                }, 500 + Math.random()*2000);
                             }
                         }
                     });
