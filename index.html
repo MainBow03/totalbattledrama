@@ -619,7 +619,7 @@
 
                     // Host NPC Engine Tick
                     if(isHost && data.status === 'playing') {
-                        npcEngine.tick(localState, JSON.parse(oldState || "{}"));
+                        npcEngine.tick(localState, oldData);
                     }
                 }, (err) => {
                     console.error("Snapshot error:", err);
@@ -1192,25 +1192,31 @@
                         this.renderHUD(state.players, pIds, null, 'points', '⭐');
                         const area = document.getElementById('minigame-render-area');
                         
-                        let isGreen = state.status === 'ready';
-                        let canClick = isGreen && pIds.includes(user.uid);
+                        let isParticipant = pIds.includes(user.uid);
+                        let isGreen = Date.now() >= state.triggerTime;
 
                         area.innerHTML = `
                             <button id="reaction-btn" 
                                 class="w-64 h-64 rounded-full font-black text-4xl shadow-2xl transition-colors duration-75 
                                 ${isGreen ? 'bg-green-500 text-white cursor-pointer active:scale-95' : 'bg-red-500 text-red-900 cursor-not-allowed'}"
-                                onclick="if(${canClick}) actions.reaction_click()">
+                                onclick="if(${isParticipant}) actions.reaction_click()">
                                 ${isGreen ? 'CLICCA!' : 'ATTENDI...'}
                             </button>
                         `;
 
                         // Client-side visual update if waiting (doesn't write to DB)
-                        if(state.status === 'waiting' && state.triggerTime) {
+                        if(state.status === 'waiting' && !isGreen) {
                             const timeToWait = state.triggerTime - Date.now();
                             if(timeToWait > 0) {
                                 setTimeout(() => {
                                     const btn = document.getElementById('reaction-btn');
-                                    if(btn) { btn.classList.replace('bg-red-500', 'bg-green-500'); btn.classList.replace('text-red-900', 'text-white'); btn.innerText = 'CLICCA!'; }
+                                    if(btn) { 
+                                        btn.classList.replace('bg-red-500', 'bg-green-500'); 
+                                        btn.classList.replace('text-red-900', 'text-white'); 
+                                        btn.classList.replace('cursor-not-allowed', 'cursor-pointer');
+                                        btn.classList.add('active:scale-95');
+                                        btn.innerText = 'CLICCA!'; 
+                                    }
                                 }, timeToWait);
                             }
                         }
