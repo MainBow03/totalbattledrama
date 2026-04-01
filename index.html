@@ -160,18 +160,43 @@
     </div>
 
     <!-- GAME SCREEN -->
-    <div id="screen-game" class="hidden flex-1 flex flex-col h-full bg-white/5 backdrop-blur-sm">
+    <div id="screen-game" class="hidden flex-1 flex flex-col h-full bg-white/5 backdrop-blur-sm relative">
         
         <!-- Header Partita -->
-        <div class="bg-slate-900/60 backdrop-blur border-b border-white/10 p-3 flex justify-between items-center">
+        <div class="bg-slate-900/60 backdrop-blur border-b border-white/10 p-3 flex justify-between items-center z-40">
             <div>
                 <h2 class="text-lg font-bold text-blue-400">Round <span id="game-round-number">1</span></h2>
                 <p class="text-xs text-slate-300">Vivi: <span id="game-alive-count">0</span> | Sfida a: <span id="game-challenge-type">3</span></p>
             </div>
             <div class="flex items-center">
-                <div id="game-phase-indicator" class="font-bold text-yellow-400 uppercase tracking-widest">Attesa...</div>
+                <div id="game-phase-indicator" class="font-bold text-yellow-400 uppercase tracking-widest hidden md:block">Attesa...</div>
                 <!-- Pulsante Emergenza Host per sbloccare i bot -->
-                <button id="btn-force-resolve" onclick="actions.force_resolve()" class="hidden bg-red-600 hover:bg-red-500 text-xs px-3 py-1 rounded text-white font-bold ml-4 transition-colors border border-red-400 shadow-[0_0_8px_#ef4444]">⚡ SIMULA SFIDA</button>
+                <button id="btn-force-resolve" onclick="actions.force_resolve()" class="hidden bg-red-600 hover:bg-red-500 text-xs px-3 py-1 rounded text-white font-bold ml-4 transition-colors border border-red-400 shadow-[0_0_8px_#ef4444]">⚡ SIMULA</button>
+                
+                <!-- Chat Toggle Button -->
+                <button onclick="ui.toggleChat()" class="relative ml-2 md:ml-4 flex items-center justify-center w-10 h-10 bg-slate-800 hover:bg-slate-700 text-xl rounded-full border border-slate-600 transition-colors shadow-lg">
+                    💬
+                    <!-- Notification Dot -->
+                    <span id="chat-notification-dot" class="hidden absolute -top-1 -right-1 flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Finestra Chat Fluttuante (Nascosta di default) -->
+        <div id="floating-chat-container" class="hidden absolute top-[70px] right-2 md:right-4 w-72 md:w-80 h-[28rem] max-h-[70vh] bg-slate-900/95 border border-slate-600 rounded-xl shadow-2xl z-[60] flex flex-col backdrop-blur-lg overflow-hidden transition-all duration-300">
+            <div class="p-3 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+                <h3 class="text-sm font-bold text-blue-300 uppercase">Chat Globale</h3>
+                <button onclick="ui.toggleChat()" class="text-slate-400 hover:text-white font-bold text-lg leading-none">&times;</button>
+            </div>
+            <div id="game-chat-messages" class="flex-1 overflow-y-auto space-y-2 p-3 text-sm">
+                <!-- Messaggi -->
+            </div>
+            <div class="p-3 bg-slate-800 border-t border-slate-700 flex gap-2">
+                <input type="text" id="input-chat" class="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-white text-xs focus:outline-none focus:border-blue-500" placeholder="Scrivi messaggio..." onkeypress="if(event.key === 'Enter') actions.send_chat()">
+                <button onclick="actions.send_chat()" class="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-xs font-bold transition-colors">Invia</button>
             </div>
         </div>
 
@@ -202,7 +227,7 @@
                 </div>
 
                 <!-- Area Minigioco -->
-                <div id="minigame-container" class="hidden w-full max-w-4xl bg-slate-800 rounded-xl shadow-2xl p-6 flex flex-col items-center border border-slate-700">
+                <div id="minigame-container" class="hidden w-full max-w-4xl bg-slate-800 rounded-xl shadow-2xl p-6 flex flex-col items-center border border-slate-700 overflow-y-auto max-h-[85vh]">
                     <h2 id="minigame-title" class="text-3xl font-extrabold text-blue-400 mb-2 uppercase tracking-wider text-center">Nome Gioco</h2>
                     <p id="minigame-desc" class="text-slate-300 text-center mb-6">Descrizione del minigioco e regole.</p>
                     
@@ -229,21 +254,12 @@
 
             </div>
 
-            <!-- Sidebar Destra: Eliminati & Chat -->
+            <!-- Sidebar Destra: Solo Eliminati ora -->
             <div class="w-full md:w-56 lg:w-72 bg-slate-900/40 border-l border-white/10 hidden md:flex flex-col backdrop-blur-md">
                 <!-- Eliminati -->
-                <div class="p-3 border-b border-white/10 h-1/3 flex flex-col">
+                <div class="p-3 flex flex-col h-full">
                     <h3 class="text-xs font-bold text-red-400 uppercase mb-2">Eliminati</h3>
                     <div id="game-dead-list" class="space-y-1 overflow-y-auto flex-1"></div>
-                </div>
-                <!-- Chat -->
-                <div class="p-3 flex flex-col flex-1">
-                    <h3 class="text-xs font-bold text-blue-300 uppercase mb-2">Chat Globale</h3>
-                    <div id="game-chat-messages" class="flex-1 overflow-y-auto space-y-2 mb-2 text-sm pr-1"></div>
-                    <div class="flex gap-2 mt-auto">
-                        <input type="text" id="input-chat" class="flex-1 bg-slate-800/80 border border-white/20 rounded p-2 text-white text-xs focus:outline-none focus:border-blue-500" placeholder="Scrivi messaggio..." onkeypress="if(event.key === 'Enter') actions.send_chat()">
-                        <button onclick="actions.send_chat()" class="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-xs font-bold transition-colors">Invia</button>
-                    </div>
                 </div>
             </div>
 
@@ -467,6 +483,22 @@
                     [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
                 }
                 return array;
+            },
+            toggleChat() {
+                const chatContainer = document.getElementById('floating-chat-container');
+                const dot = document.getElementById('chat-notification-dot');
+                if (chatContainer) {
+                    chatContainer.classList.toggle('hidden');
+                    if (!chatContainer.classList.contains('hidden')) {
+                        if (dot) dot.classList.add('hidden'); // Nascondi notifica quando la si apre
+                        const chatEl = document.getElementById('game-chat-messages');
+                        if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;
+                        setTimeout(() => {
+                            const input = document.getElementById('input-chat');
+                            if (input) input.focus();
+                        }, 100);
+                    }
+                }
             }
         };
 
@@ -821,16 +853,29 @@
                     `).join('');
                 }
 
-                // Chat
+                // Chat Logic & Notification
                 const chatEl = document.getElementById('game-chat-messages');
                 if(chatEl && localState.messages) {
-                    chatEl.innerHTML = localState.messages.map(m => `
-                        <div class="bg-black/20 rounded p-2 border border-white/5">
-                            <span class="font-bold text-[10px] text-${m.uid === user.uid ? 'blue' : 'yellow'}-400 uppercase">${m.name}:</span>
-                            <span class="text-xs ml-1 text-slate-200 break-words">${m.text}</span>
-                        </div>
-                    `).join('');
-                    chatEl.scrollTop = chatEl.scrollHeight;
+                    if (window.lastMessageCount !== localState.messages.length) {
+                        chatEl.innerHTML = localState.messages.map(m => `
+                            <div class="bg-black/20 rounded p-2 border border-white/5">
+                                <span class="font-bold text-[10px] text-${m.uid === user.uid ? 'blue' : 'yellow'}-400 uppercase">${m.name}:</span>
+                                <span class="text-xs ml-1 text-slate-200 break-words">${m.text}</span>
+                            </div>
+                        `).join('');
+                        
+                        const chatContainer = document.getElementById('floating-chat-container');
+                        if (chatContainer && chatContainer.classList.contains('hidden') && window.lastMessageCount !== undefined && localState.messages.length > window.lastMessageCount) {
+                            const lastMsg = localState.messages[localState.messages.length - 1];
+                            if (lastMsg && lastMsg.uid !== user.uid) {
+                                const dot = document.getElementById('chat-notification-dot');
+                                if (dot) dot.classList.remove('hidden');
+                            }
+                        }
+                        
+                        window.lastMessageCount = localState.messages.length;
+                        setTimeout(() => chatEl.scrollTop = chatEl.scrollHeight, 50);
+                    }
                 }
 
                 // Tasto Simula Sfida (solo Host, solo durante minigioco)
@@ -1627,65 +1672,119 @@
                         const area = document.getElementById('minigame-render-area');
                         const isParticipant = pIds.includes(user.uid);
                         
-                        if(!isParticipant) {
-                            area.innerHTML = `<div class="text-xl text-slate-400">Sei uno spettatore. Osserva la corsa dei giocatori!</div>`;
-                            return;
-                        }
-
-                        const myData = state.players[user.uid];
-                        if (!myData) return;
-
                         let now = Date.now();
-                        let isBlocked = myData.clickUnlockTime > now;
-                        let timeLeft = isBlocked ? Math.ceil((myData.clickUnlockTime - now)/1000) : 0;
-
-                        let html = `<div class="flex flex-col items-center w-full relative">`;
                         
-                        // Sovrimpressione Blocco (Penalità)
-                        if(isBlocked && !myData.finished) {
-                            html += `<div class="absolute inset-0 z-50 bg-slate-900/80 flex items-center justify-center rounded-xl backdrop-blur-sm">
-                                        <span class="text-5xl font-black text-red-500 animate-pulse">${timeLeft}s</span>
-                                     </div>`;
-                        }
+                        if(!isParticipant) {
+                            let html = `<div class="w-full flex flex-col items-center">
+                                <h3 class="text-xl text-yellow-400 font-bold mb-4">Modalità Spettatore: Osserva la Gara</h3>
+                                <div class="flex flex-wrap justify-center gap-4 w-full">`;
+                            
+                            pIds.forEach(uid => {
+                                const pData = state.players[uid];
+                                const playerObj = localState.players.find(x => x.uid === uid);
+                                if (!pData || !playerObj) return;
 
-                        if(myData.finished) {
-                            html += `<div class="text-3xl text-green-400 font-bold mb-4 text-center">Hai aperto la cassaforte! ✅</div>
-                                     <p class="text-slate-400 mt-2">In attesa che gli altri falliscano...</p>`;
-                        } 
-                        else if(!myData.keyFound) {
-                            html += `<h3 class="text-xl text-yellow-400 font-bold mb-4">Trova la Chiave!</h3>
-                                     <div class="grid grid-cols-5 gap-1 md:gap-2 bg-slate-900 p-2 md:p-4 rounded-xl shadow-inner border border-slate-700 select-none touch-none">`;
-                            for(let i=0; i<25; i++) {
-                                let revealed = myData.gridRevealed[i];
-                                let content = revealed ? '❌' : '❓';
-                                let tileClass = revealed ? 'bg-slate-800 opacity-50 cursor-default' : 'bg-slate-700 hover:bg-slate-600 cursor-pointer shadow';
-                                html += `<div class="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center text-2xl md:text-3xl rounded transition-all duration-200 ${tileClass}" 
-                                              onpointerdown="if(!${revealed} && !${isBlocked}) { event.preventDefault(); actions.treasure_grid_click(${i}); }">${content}</div>`;
-                            }
-                            html += `</div>`;
-                        } 
-                        else {
-                            html += `<h3 class="text-xl text-blue-400 font-bold mb-4">Decifra la Cassaforte!</h3>
-                                     <div class="flex gap-2 mb-6">`;
-                            // Visualizza slot cassaforte
-                            for(let i=0; i<4; i++) {
-                                let isUnlocked = i < myData.comboProgress;
-                                html += `<div class="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center text-2xl md:text-3xl rounded-xl border-2 ${isUnlocked ? 'bg-green-900 border-green-500 text-green-400 shadow-[0_0_15px_#22c55e]' : 'bg-slate-800 border-slate-600'}">
-                                            ${isUnlocked ? myData.combo[i] : '🔒'}
+                                let isBlocked = pData.clickUnlockTime > now;
+                                let timeLeft = isBlocked ? Math.ceil((pData.clickUnlockTime - now)/1000) : 0;
+
+                                html += `<div class="flex flex-col items-center bg-slate-800 p-3 rounded-xl border border-slate-700 relative scale-90 md:scale-100 origin-top">`;
+                                html += `<div class="flex items-center gap-2 mb-2">
+                                            <img src="${ui.getChar(playerObj.charId).url}" class="w-6 h-6 rounded-full object-cover">
+                                            <span class="text-sm font-bold text-blue-300">${playerObj.name}</span>
+                                         </div>`;
+                                
+                                if (isBlocked && !pData.finished) {
+                                    html += `<div class="absolute inset-0 z-50 bg-slate-900/80 flex items-center justify-center rounded-xl backdrop-blur-sm mt-10">
+                                                <span class="text-4xl font-black text-red-500 animate-pulse">${timeLeft}s</span>
+                                             </div>`;
+                                }
+
+                                if (pData.finished) {
+                                    html += `<div class="w-48 h-48 flex flex-col items-center justify-center text-xl text-green-400 font-bold text-center bg-slate-900 rounded-xl border border-green-500/30">
+                                                <span class="text-4xl mb-2">✅</span>
+                                                <span>Aperto!</span>
+                                             </div>`;
+                                } else if (!pData.keyFound) {
+                                    html += `<div class="grid grid-cols-5 gap-1 bg-slate-900 p-2 rounded-xl shadow-inner border border-slate-700">`;
+                                    for(let i=0; i<25; i++) {
+                                        let revealed = pData.gridRevealed[i];
+                                        let content = revealed ? '❌' : '❓';
+                                        let tileClass = revealed ? 'bg-slate-800 opacity-50' : 'bg-slate-700';
+                                        html += `<div class="w-8 h-8 flex items-center justify-center text-sm rounded ${tileClass}">${content}</div>`;
+                                    }
+                                    html += `</div>`;
+                                } else {
+                                    html += `<div class="flex flex-col items-center justify-center w-48 h-48 bg-slate-900 p-2 rounded-xl shadow-inner border border-slate-700">
+                                                <div class="flex gap-1 mb-4">`;
+                                    for(let i=0; i<4; i++) {
+                                        let isUnlocked = i < pData.comboProgress;
+                                        html += `<div class="w-8 h-8 flex items-center justify-center text-sm rounded border ${isUnlocked ? 'bg-green-900 border-green-500 text-green-400 shadow-[0_0_10px_#22c55e]' : 'bg-slate-800 border-slate-600'}">
+                                                    ${isUnlocked ? pData.combo[i] : '🔒'}
+                                                 </div>`;
+                                    }
+                                    html += `</div><span class="text-sm font-bold text-blue-400 animate-pulse">Decifrando...</span></div>`;
+                                }
+
+                                html += `</div>`;
+                            });
+
+                            html += `</div></div>`;
+                            area.innerHTML = html;
+                        } else {
+                            const myData = state.players[user.uid];
+                            if (!myData) return;
+
+                            let isBlocked = myData.clickUnlockTime > now;
+                            let timeLeft = isBlocked ? Math.ceil((myData.clickUnlockTime - now)/1000) : 0;
+
+                            let html = `<div class="flex flex-col items-center w-full relative">`;
+                            
+                            // Sovrimpressione Blocco (Penalità)
+                            if(isBlocked && !myData.finished) {
+                                html += `<div class="absolute inset-0 z-50 bg-slate-900/80 flex items-center justify-center rounded-xl backdrop-blur-sm">
+                                            <span class="text-5xl font-black text-red-500 animate-pulse">${timeLeft}s</span>
                                          </div>`;
                             }
-                            html += `</div><div class="grid grid-cols-4 gap-2 md:gap-3">`;
-                            // Tastierino Figure
-                            const emojis = ['⭕', '🟥', '🔺', '⭐', '☂️', '🏠', '🚗', '🐶'];
-                            emojis.forEach(emoji => {
-                                html += `<button class="w-12 h-12 md:w-16 md:h-16 text-2xl md:text-3xl bg-slate-700 hover:bg-blue-600 rounded-xl shadow border border-slate-600 active:scale-95 active:bg-blue-500 transition-all select-none touch-none"
-                                                 onpointerdown="if(!${isBlocked}) { event.preventDefault(); actions.treasure_safe_click('${emoji}'); }">${emoji}</button>`;
-                            });
-                            html += `</div>`;
-                        }
 
-                        html += `</div>`;
-                        area.innerHTML = html;
+                            if(myData.finished) {
+                                html += `<div class="text-3xl text-green-400 font-bold mb-4 text-center">Hai aperto la cassaforte! ✅</div>
+                                         <p class="text-slate-400 mt-2">In attesa che gli altri falliscano...</p>`;
+                            } 
+                            else if(!myData.keyFound) {
+                                html += `<h3 class="text-xl text-yellow-400 font-bold mb-4">Trova la Chiave!</h3>
+                                         <div class="grid grid-cols-5 gap-1 md:gap-2 bg-slate-900 p-2 md:p-4 rounded-xl shadow-inner border border-slate-700 select-none touch-none">`;
+                                for(let i=0; i<25; i++) {
+                                    let revealed = myData.gridRevealed[i];
+                                    let content = revealed ? '❌' : '❓';
+                                    let tileClass = revealed ? 'bg-slate-800 opacity-50 cursor-default' : 'bg-slate-700 hover:bg-slate-600 cursor-pointer shadow';
+                                    html += `<div class="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center text-2xl md:text-3xl rounded transition-all duration-200 ${tileClass}" 
+                                                  onpointerdown="if(!${revealed} && !${isBlocked}) { event.preventDefault(); actions.treasure_grid_click(${i}); }">${content}</div>`;
+                                }
+                                html += `</div>`;
+                            } 
+                            else {
+                                html += `<h3 class="text-xl text-blue-400 font-bold mb-4">Decifra la Cassaforte!</h3>
+                                         <div class="flex gap-2 mb-6">`;
+                                // Visualizza slot cassaforte
+                                for(let i=0; i<4; i++) {
+                                    let isUnlocked = i < myData.comboProgress;
+                                    html += `<div class="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center text-2xl md:text-3xl rounded-xl border-2 ${isUnlocked ? 'bg-green-900 border-green-500 text-green-400 shadow-[0_0_15px_#22c55e]' : 'bg-slate-800 border-slate-600'}">
+                                                ${isUnlocked ? myData.combo[i] : '🔒'}
+                                             </div>`;
+                                }
+                                html += `</div><div class="grid grid-cols-4 gap-2 md:gap-3">`;
+                                // Tastierino Figure
+                                const emojis = ['⭕', '🟥', '🔺', '⭐', '☂️', '🏠', '🚗', '🐶'];
+                                emojis.forEach(emoji => {
+                                    html += `<button class="w-12 h-12 md:w-16 md:h-16 text-2xl md:text-3xl bg-slate-700 hover:bg-blue-600 rounded-xl shadow border border-slate-600 active:scale-95 active:bg-blue-500 transition-all select-none touch-none"
+                                                     onpointerdown="if(!${isBlocked}) { event.preventDefault(); actions.treasure_safe_click('${emoji}'); }">${emoji}</button>`;
+                                });
+                                html += `</div>`;
+                            }
+
+                            html += `</div>`;
+                            area.innerHTML = html;
+                        }
 
                         // Timer per aggiornare fluidamente lo schermo di blocco rosso
                         if(!window.treasureInterval) {
