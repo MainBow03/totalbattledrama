@@ -1487,16 +1487,24 @@
                         let isParticipant = pIds.includes(user.uid);
                         
                         let html = `<div class="flex flex-col items-center w-full">`;
+                        
+                        // FIX: Contenitore ad altezza fissa per i testi per prevenire il salto della griglia
+                        html += `<div class="h-14 flex flex-col items-center justify-end mb-3">`;
+                        
                         if (state.phase === 'memorize') {
-                            html += `<h3 class="text-xl text-yellow-400 mb-2 font-bold animate-pulse">Memorizza! ${timeLeft}s</h3>`;
+                            html += `<h3 class="text-xl text-yellow-400 font-bold animate-pulse">Memorizza! ${timeLeft}s</h3>`;
+                            html += `<p class="text-sm opacity-0 select-none pointer-events-none">Placeholder</p>`; // Spazio invisibile
                         } else if (state.phase === 'playing') {
-                            html += `<h3 class="text-xl text-blue-400 mb-2 font-bold">Trova le 8 diverse! ${timeLeft}s</h3>`;
-                            if(isParticipant) html += `<p class="text-sm mb-4 text-slate-300">Selezionate: <span class="font-bold text-white">${myData.selected ? myData.selected.length : 0}/8</span></p>`;
+                            html += `<h3 class="text-xl text-blue-400 font-bold">Trova le 8 diverse! ${timeLeft}s</h3>`;
+                            html += `<p class="text-sm text-slate-300 ${isParticipant ? '' : 'opacity-0'}">Selezionate: <span class="font-bold text-white">${myData.selected ? myData.selected.length : 0}/8</span></p>`;
                         } else if (state.phase === 'result') {
-                            html += `<h3 class="text-xl text-green-400 mb-4 font-bold">Risultati!</h3>`;
+                            html += `<h3 class="text-xl text-green-400 font-bold">Risultati!</h3>`;
+                            html += `<p class="text-sm opacity-0 select-none pointer-events-none">Placeholder</p>`; // Spazio invisibile
                         } else {
                             html += `<h3>...</h3>`;
                         }
+                        
+                        html += `</div>`; // Fine contenitore testi
 
                         html += `<div class="grid grid-cols-10 gap-1 md:gap-2 bg-slate-900 p-2 md:p-4 rounded-xl shadow-inner border border-slate-700 select-none touch-none">`;
                         for (let i = 0; i < 100; i++) {
