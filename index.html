@@ -368,7 +368,7 @@
             { id: 'c72', name: 'Ade', url: 'https://i.pinimg.com/736x/e7/29/0c/e7290c161c9517ba4038274d1aa8a6cf.jpg' }
         ];
 
-        const MINIGAMES = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence'];
+        const MINIGAMES = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence', 'ricordello'];
 
         // ==========================================
         // AUDIO ENGINE (Sintetizzatore nativo)
@@ -1035,7 +1035,7 @@
                 // Scegli gioco casuale compatibile col numero di giocatori
                 let availableGames = MINIGAMES;
                 if(selectedIds.length === 3) {
-                    availableGames = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence'];
+                    availableGames = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence', 'ricordello'];
                 }
                 
                 const gameName = availableGames[Math.floor(Math.random() * availableGames.length)];
@@ -1451,6 +1451,110 @@
                             actions.sequence_click(targetIdx, currentUid);
                         }
                     }
+                },
+
+                ricordello: {
+                    title: "Ricordello",
+                    desc: "Memorizza le 8 emoji diverse! Hai 5s, poi trovale al buio in 15s.",
+                    init(pIds) {
+                        const emojis = ['😀', '😎', '🍎', '🍓', '🐶', '🦊', '🚗', '🚕', '🏀', '⚽'];
+                        const pair = ui.shuffle(emojis).slice(0, 2);
+                        const standardEmoji = pair[0];
+                        const targetEmoji = pair[1];
+                        
+                        let grid = Array(100).fill(false);
+                        let targetsPlaced = 0;
+                        while(targetsPlaced < 8) {
+                            let idx = Math.floor(Math.random() * 100);
+                            if(!grid[idx]) { grid[idx] = true; targetsPlaced++; }
+                        }
+                        
+                        let players = {};
+                        pIds.forEach(id => players[id] = { selected: [], score: 0, lives: 2 });
+                        return { grid, standardEmoji, targetEmoji, players, phase: 'memorize', endTime: Date.now() + 5000 };
+                    },
+                    render(state, pIds) {
+                        this.renderHUD(state.players, pIds);
+                        const area = document.getElementById('minigame-render-area');
+                        let timeLeft = Math.max(0, Math.ceil((state.endTime - Date.now())/1000));
+                        let myData = state.players[user.uid] || { selected: [] };
+                        let isParticipant = pIds.includes(user.uid);
+                        
+                        let html = `<div class="flex flex-col items-center w-full">`;
+                        if (state.phase === 'memorize') {
+                            html += `<h3 class="text-xl text-yellow-400 mb-2 font-bold animate-pulse">Memorizza! ${timeLeft}s</h3>`;
+                        } else if (state.phase === 'playing') {
+                            html += `<h3 class="text-xl text-blue-400 mb-2 font-bold">Trova le 8 diverse! ${timeLeft}s</h3>`;
+                            if(isParticipant) html += `<p class="text-sm mb-4 text-slate-300">Selezionate: <span class="font-bold text-white">${myData.selected ? myData.selected.length : 0}/8</span></p>`;
+                        } else if (state.phase === 'result') {
+                            html += `<h3 class="text-xl text-green-400 mb-4 font-bold">Risultati!</h3>`;
+                        } else {
+                            html += `<h3>...</h3>`;
+                        }
+
+                        html += `<div class="grid grid-cols-10 gap-1 md:gap-2 bg-slate-900 p-2 md:p-4 rounded-xl shadow-inner border border-slate-700 select-none touch-none">`;
+                        for (let i = 0; i < 100; i++) {
+                            let isTarget = state.grid[i];
+                            let isSelectedByMe = myData.selected ? myData.selected.includes(i) : false;
+                            let displayEmoji = '';
+                            let tileClass = 'w-6 h-6 md:w-8 md:h-8 flex items-center justify-center text-sm md:text-xl rounded cursor-pointer transition-all duration-200 ';
+                            
+                            if (state.phase === 'memorize') {
+                                displayEmoji = isTarget ? state.targetEmoji : state.standardEmoji;
+                                tileClass += 'bg-slate-700';
+                            } else if (state.phase === 'playing') {
+                                displayEmoji = '❓';
+                                tileClass += isSelectedByMe ? 'bg-blue-500 border border-white shadow-[0_0_10px_#3b82f6] scale-110 z-10' : 'bg-slate-700 hover:bg-slate-600';
+                            } else {
+                                displayEmoji = isTarget ? state.targetEmoji : state.standardEmoji;
+                                if (isTarget && isSelectedByMe) tileClass += 'bg-green-500 border border-white scale-110 z-10'; // Indovinato
+                                else if (isTarget && !isSelectedByMe) tileClass += 'bg-yellow-500 animate-pulse'; // Mancato
+                                else if (!isTarget && isSelectedByMe) tileClass += 'bg-red-500 border border-white scale-110 z-10'; // Sbagliato
+                                else tileClass += 'bg-slate-800 opacity-30'; // Ignoto
+                            }
+
+                            html += `<div class="${tileClass}" onpointerdown="if(${state.phase === 'playing'} && ${isParticipant}) { event.preventDefault(); actions.ricordello_click(${i}); }">${displayEmoji}</div>`;
+                        }
+                        html += `</div></div>`;
+                        area.innerHTML = html;
+
+                        if(!window.ricordelloInterval) {
+                            window.ricordelloInterval = setInterval(() => {
+                                if(localState.gameState.currentMinigame !== 'ricordello') { clearInterval(window.ricordelloInterval); window.ricordelloInterval=null; return; }
+                                logic.renderGame();
+                            }, 1000);
+                        }
+                    },
+                    npcTurn(state, pIds, currentUid) {
+                        if (state.phase === 'playing') {
+                            let myData = state.players[currentUid];
+                            // I bot fanno tutte e 8 le selezioni assieme alla velocità della luce per risparmiare traffico di rete
+                            if (myData && myData.selected && myData.selected.length === 0) {
+                                let targetIndices = [];
+                                let standardIndices = [];
+                                state.grid.forEach((isTarget, idx) => {
+                                    if (isTarget) targetIndices.push(idx);
+                                    else standardIndices.push(idx);
+                                });
+                                
+                                // Il bot indovina da 4 a 6 mattonelle esatte, le altre le sbaglia
+                                let correctCount = Math.floor(Math.random() * 3) + 4; 
+                                let botSelected = [];
+                                
+                                targetIndices = ui.shuffle(targetIndices);
+                                standardIndices = ui.shuffle(standardIndices);
+                                
+                                for(let i=0; i<correctCount; i++) botSelected.push(targetIndices[i]);
+                                for(let i=0; i<(8-correctCount); i++) botSelected.push(standardIndices[i]);
+                                
+                                botSelected = ui.shuffle(botSelected);
+                                
+                                let newPlayers = JSON.parse(JSON.stringify(state.players));
+                                newPlayers[currentUid].selected = botSelected;
+                                actions.updateState({ ...state, players: newPlayers });
+                            }
+                        }
+                    }
                 }
             },
 
@@ -1685,6 +1789,29 @@
                 }
             },
 
+            // --- RICORDELLO ---
+            async ricordello_click(index, overrideUid = null) {
+                const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
+                let state = localState.gameState.minigameState;
+                
+                if(!state || state.phase !== 'playing' || !state.players || !state.players[uid]) return;
+                
+                let mySelected = [...(state.players[uid].selected || [])];
+                
+                // Attiva/Disattiva la selezione
+                if (mySelected.includes(index)) {
+                    mySelected = mySelected.filter(i => i !== index);
+                } else {
+                    if (mySelected.length >= 8) return; // Limite massimo di 8 selezioni
+                    mySelected.push(index);
+                }
+                
+                let newPlayers = JSON.parse(JSON.stringify(state.players));
+                newPlayers[uid].selected = mySelected;
+                
+                await this.updateState({ ...state, players: newPlayers });
+            },
+
             // --- CHAT ---
             async send_chat() {
                 const input = document.getElementById('input-chat');
@@ -1867,6 +1994,79 @@
                     return;
                 }
 
+                // 6. Ricordello (Gestione fasi)
+                if (gm.currentMinigame === 'ricordello') {
+                    if (!window.ricordelloHostChecker) {
+                        window.ricordelloHostChecker = setInterval(async () => {
+                            if(localState.gameState.currentMinigame !== 'ricordello') { 
+                                clearInterval(window.ricordelloHostChecker); window.ricordelloHostChecker=null; 
+                                return; 
+                            }
+                            
+                            let s = localState.gameState.minigameState;
+                            let now = Date.now();
+                            
+                            // Fine memorizzazione -> Inizio gioco
+                            if (s.phase === 'memorize' && now >= s.endTime) {
+                                await actions.updateState({...s, phase: 'playing', endTime: now + 15000}); // 15 secondi per cliccare
+                            } 
+                            // Fine gioco -> Calcolo punteggi
+                            else if (s.phase === 'playing' && now >= s.endTime) {
+                                let newPlayers = JSON.parse(JSON.stringify(s.players));
+                                for(const [uid, data] of Object.entries(newPlayers)) {
+                                    let score = 0;
+                                    if (data.selected) {
+                                        data.selected.forEach(idx => {
+                                            if (s.grid[idx]) score++;
+                                        });
+                                    }
+                                    newPlayers[uid].score = score;
+                                }
+                                await actions.updateState({...s, players: newPlayers, phase: 'result', endTime: now + 5000}); // Mostra risultati per 5 secondi
+                            }
+                            // Fine visione risultati -> Elimina chi ha fatto meno e resetta
+                            else if (s.phase === 'result' && now >= s.endTime) {
+                                clearInterval(window.ricordelloHostChecker); window.ricordelloHostChecker=null;
+                                
+                                let lowest = 999;
+                                let losers = [];
+                                for(const [uid, data] of Object.entries(s.players)) {
+                                    if(data.score < lowest) { lowest = data.score; losers = [uid]; }
+                                    else if(data.score === lowest) losers.push(uid);
+                                }
+                                
+                                if(losers.length > 1) losers = [losers[Math.floor(Math.random()*losers.length)]];
+                                
+                                let newPlayers = JSON.parse(JSON.stringify(s.players));
+                                let isGameOver = false;
+                                let elim = [];
+                                
+                                for (let id of losers) {
+                                    newPlayers[id].lives--;
+                                    await actions.recordStatLoss(id);
+                                    if(newPlayers[id].lives <= 0) { isGameOver = true; elim.push(id); }
+                                }
+
+                                if(isGameOver) {
+                                    await hostEngine.resolveGame(elim);
+                                } else {
+                                    // Prepara nuova griglia per prossimo round
+                                    const emojis = ['😀', '😎', '🍎', '🍓', '🐶', '🦊', '🚗', '🚕', '🏀', '⚽'];
+                                    const pair = ui.shuffle(emojis).slice(0, 2);
+                                    let grid = Array(100).fill(false);
+                                    let targetsPlaced = 0;
+                                    while(targetsPlaced < 8) {
+                                        let idx = Math.floor(Math.random() * 100);
+                                        if(!grid[idx]) { grid[idx] = true; targetsPlaced++; }
+                                    }
+                                    for(let k in newPlayers) { newPlayers[k].selected = []; newPlayers[k].score = 0; }
+                                    await actions.updateState({...s, grid, standardEmoji: pair[0], targetEmoji: pair[1], players: newPlayers, phase: 'memorize', endTime: Date.now() + 5000});
+                                }
+                            }
+                        }, 500);
+                    }
+                }
+
                 const minigame = minigamesEngine.games[gm.currentMinigame];
                 if(!minigame || !minigame.npcTurn) return;
 
@@ -1874,7 +2074,7 @@
                 const pIds = gm.selectedPlayers;
                 
                 // Giochi a turni (Tiles, Sequence)
-                if(gm.minigameState.turnIndex !== undefined) {
+                if(gm.minigameState.turnIndex !== undefined && gm.currentMinigame !== 'bomb') {
                     let turnIdx = gm.minigameState.turnIndex;
                     let activeUid = pIds[turnIdx];
                     let p = state.players.find(x => x.uid === activeUid);
@@ -1882,10 +2082,9 @@
                     if(p && p.isNpc) {
                         // Crea un hash univoco per questo esatto stato del turno
                         let revealedCount = gm.minigameState.tiles ? gm.minigameState.tiles.filter(t=>t.revealed).length : 0;
-                        let bombPasses = gm.minigameState.passes || 0;
                         let seqHash = gm.minigameState.sequence ? gm.minigameState.sequence.join('') : '';
                         
-                        let stateHash = `${gm.currentMinigame}_${gm.round}_turn${turnIdx}_prog${gm.minigameState.progress || 0}_err${gm.minigameState.errorIndex !== null ? gm.minigameState.errorIndex : 'none'}_rev${revealedCount}_pass${bombPasses}_seq${seqHash}`;
+                        let stateHash = `${gm.currentMinigame}_${gm.round}_turn${turnIdx}_prog${gm.minigameState.progress || 0}_err${gm.minigameState.errorIndex !== null ? gm.minigameState.errorIndex : 'none'}_rev${revealedCount}_seq${seqHash}`;
                         
                         if (window.npcActionHashes['turn'] !== stateHash) {
                             window.npcActionHashes['turn'] = stateHash;
@@ -1898,7 +2097,7 @@
                         }
                     }
                 }
-                // Giochi simultanei (Dadi, Reaction, Mash, Votazione)
+                // Giochi simultanei (Dadi, Reaction, Mash, Votazione, Ricordello, Bomb)
                 else {
                     let pNpcs = state.players.filter(x => pIds.includes(x.uid) && x.isNpc);
                     
@@ -1922,12 +2121,23 @@
                                 };
                                 setTimeout(mashLoop, 500);
                             }
+                        } else if(gm.currentMinigame === 'ricordello') {
+                            let actionHash = `${gm.currentMinigame}_${gm.round}_${gm.minigameState.phase}`;
+                            if (window.npcActionHashes['ricordello_' + npc.uid] !== actionHash) {
+                                window.npcActionHashes['ricordello_' + npc.uid] = actionHash;
+                                setTimeout(() => {
+                                    if (localState.gameState.phase === 'playing') {
+                                        minigame.npcTurn(localState.gameState.minigameState, pIds, npc.uid);
+                                    }
+                                }, 1000 + Math.random()*3000); // Simuliamo che il bot "pensi" un po' prima di scegliere la combinazione
+                            }
                         } else {
                             // HASH UNIVERSALE per le azioni simultanee dei BOT: rileva esattamente i reset
                             let botData = gm.minigameState.players ? gm.minigameState.players[npc.uid] : {};
                             let botVote = gm.minigameState.votes ? gm.minigameState.votes[npc.uid] : null;
                             let subRound = gm.minigameState.subRound || 0;
-                            let actionHash = `${gm.currentMinigame}_${gm.round}_sub${subRound}_${gm.minigameState.phase}_${gm.minigameState.status}_${gm.minigameState.triggerTime}_${JSON.stringify(botData)}_${botVote}`;
+                            let bombPasses = gm.minigameState.passes || 0;
+                            let actionHash = `${gm.currentMinigame}_${gm.round}_sub${subRound}_${gm.minigameState.phase}_${gm.minigameState.status}_${gm.minigameState.triggerTime}_${JSON.stringify(botData)}_${botVote}_pass${bombPasses}`;
                             
                             if (window.npcActionHashes[npc.uid] !== actionHash) {
                                 window.npcActionHashes[npc.uid] = actionHash;
