@@ -1766,13 +1766,14 @@
                         if (pIds.length - newState.winners.length <= 1) {
                             // C'è solo 1 perdente rimasto!
                             const loser = pIds.find(id => !newState.winners.includes(id));
-                            if (isHost) setTimeout(() => hostEngine.resolveGame([loser]), 1000);
+                            setTimeout(() => hostEngine.resolveGame([loser]), 1000); // Rimosso if (isHost) per evitare stalli se vince un client non-host
                             newState.phase = 'won';
                         } else {
                             // C'è ancora più di un giocatore a rischio (caso 3 giocatori originali). Resetta e continua
                             newState.sequence = ui.shuffle([1,2,3,4,5,6,7]);
                             newState.colors = ui.shuffle(['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899']);
                             newState.progress = 0;
+                            newState.known = []; // Azzeriamo la memoria del bot per la nuova sequenza
                             // Salta i vincitori per il prossimo turno
                             let nextTurn = (state.turnIndex + 1) % pIds.length;
                             while(newState.winners.includes(pIds[nextTurn])) {
@@ -1785,7 +1786,8 @@
                 } else {
                     // Sbagliato!
                     audioEngine.playWrong();
-                    await this.updateState({ ...state, phase: 'showing_error', errorIndex: index, errorTime: Date.now(), known: newKnown });
+                    // Aggiunto errorCount per forzare l'aggiornamento dell'Hash del bot e prevenire stalli
+                    await this.updateState({ ...state, phase: 'showing_error', errorIndex: index, errorTime: Date.now(), known: newKnown, errorCount: (state.errorCount || 0) + 1 });
                 }
             },
 
@@ -2083,8 +2085,9 @@
                         // Crea un hash univoco per questo esatto stato del turno
                         let revealedCount = gm.minigameState.tiles ? gm.minigameState.tiles.filter(t=>t.revealed).length : 0;
                         let seqHash = gm.minigameState.sequence ? gm.minigameState.sequence.join('') : '';
+                        let errCount = gm.minigameState.errorCount || 0; // Prende il counter degli errori
                         
-                        let stateHash = `${gm.currentMinigame}_${gm.round}_turn${turnIdx}_prog${gm.minigameState.progress || 0}_err${gm.minigameState.errorIndex !== null ? gm.minigameState.errorIndex : 'none'}_rev${revealedCount}_seq${seqHash}`;
+                        let stateHash = `${gm.currentMinigame}_${gm.round}_turn${turnIdx}_prog${gm.minigameState.progress || 0}_err${gm.minigameState.errorIndex !== null ? gm.minigameState.errorIndex : 'none'}_rev${revealedCount}_seq${seqHash}_errCount${errCount}`;
                         
                         if (window.npcActionHashes['turn'] !== stateHash) {
                             window.npcActionHashes['turn'] = stateHash;
