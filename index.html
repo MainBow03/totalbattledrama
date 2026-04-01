@@ -84,6 +84,7 @@
             <div class="space-y-4">
                 <button onclick="ui.showScreen('create')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Crea Stanza (Host)</button>
                 <button onclick="ui.showScreen('join')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Unisciti a una Stanza</button>
+                <button onclick="ui.showScreen('test-select')" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg border border-orange-500">Prova Minigioco (Stanza Test)</button>
             </div>
         </div>
     </div>
@@ -128,6 +129,15 @@
                 <button onclick="logic.joinRoom()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-lg">Entra</button>
             </div>
         </div>
+    </div>
+
+    <!-- TEST SELECT SCREEN -->
+    <div id="screen-test-select" class="hidden flex-1 flex flex-col items-center justify-center p-4 overflow-y-auto w-full">
+        <h2 class="text-3xl md:text-4xl font-bold mb-6 text-center text-orange-400 drop-shadow-md">Scegli cosa testare</h2>
+        <div id="test-games-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full max-w-5xl">
+            <!-- Generato via JS -->
+        </div>
+        <button onclick="ui.showScreen('menu')" class="mt-8 bg-slate-600 hover:bg-slate-500 text-white py-3 px-8 rounded-lg font-bold transition-colors">Torna al Menu</button>
     </div>
 
     <!-- LOBBY (CHARACTER SELECT) -->
@@ -459,7 +469,7 @@
         // UI & UTILS
         // ==========================================
         const ui = {
-            screens: ['menu', 'create', 'join', 'lobby', 'game', 'stats'],
+            screens: ['menu', 'create', 'join', 'lobby', 'game', 'stats', 'test-select'],
             showScreen(id) {
                 this.screens.forEach(s => document.getElementById(`screen-${s}`).classList.add('hidden'));
                 document.getElementById(`screen-${id}`).classList.remove('hidden');
@@ -499,6 +509,20 @@
                         }, 100);
                     }
                 }
+            },
+            renderTestSelect() {
+                const container = document.getElementById('test-games-grid');
+                if(!container) return;
+                let html = '';
+                for(const [key, game] of Object.entries(minigamesEngine.games)) {
+                    html += `
+                        <div class="bg-slate-800 p-4 rounded-xl border border-orange-500/30 flex flex-col items-center text-center hover:bg-slate-700 hover:border-orange-500 cursor-pointer transition-all shadow-lg active:scale-95" onclick="logic.startTestMode('${key}')">
+                            <h3 class="font-bold text-xl text-orange-400 mb-2">${game.title}</h3>
+                            <p class="text-xs text-slate-300">${game.desc}</p>
+                        </div>
+                    `;
+                }
+                container.innerHTML = html;
             }
         };
 
@@ -619,6 +643,49 @@
                     
                 } catch(e) {
                     ui.notify("Errore di connessione.", "error");
+                    console.error(e);
+                }
+            },
+
+            async startTestMode(gameName) {
+                audioEngine.init(); // Sblocca audio
+                const nickname = document.getElementById('input-nickname').value.trim() || 'Host (Tester)';
+                if(!user) await logic.initAuth();
+                
+                currentRoomId = ui.generateId();
+                isHost = true;
+
+                const initialData = {
+                    id: currentRoomId,
+                    status: 'character_select', // Ti porta in Lobby invece che in partita!
+                    hostId: user.uid,
+                    settings: { totalPlayers: 3, humanLimit: 3, isTestMode: gameName }, // Crea stanza da max 3 persone
+                    players: [{
+                        uid: user.uid,
+                        name: nickname,
+                        isNpc: false,
+                        charId: null,
+                        isReady: false,
+                        isAlive: true,
+                        stats: { minigames: 0, wins: 0, livesLost: 0, order: 0 }
+                    }],
+                    gameState: {
+                        round: 0,
+                        phase: 'waiting',
+                        selectedPlayers: [],
+                        currentMinigame: null,
+                        minigameState: {},
+                        eliminatedThisRound: []
+                    },
+                    messages: []
+                };
+
+                try {
+                    await setDoc(logic.getRoomDoc(currentRoomId), initialData);
+                    logic.listenToRoom();
+                    ui.showScreen('lobby');
+                } catch(e) {
+                    ui.notify("Errore avvio test.", "error");
                     console.error(e);
                 }
             },
@@ -1060,6 +1127,11 @@
 
                 let numToSelect = alive.length >= 12 ? 3 : 2;
                 
+                // Se siamo nella Modalità Test (vs 2 Bot), fai sempre sfidare tutti e 3 finché non ne muoiono 2
+                if (localState.settings.isTestMode && alive.length === 3) {
+                    numToSelect = 3;
+                }
+                
                 // Shuffle e seleziona
                 const shuffledAlive = ui.shuffle([...alive]);
                 const selected = shuffledAlive.slice(0, numToSelect).map(p => p.uid);
@@ -1086,13 +1158,19 @@
             },
 
             async initMinigame(selectedIds, isFinal) {
-                // Scegli gioco casuale compatibile col numero di giocatori
-                let availableGames = MINIGAMES;
-                if(selectedIds.length === 3) {
-                    availableGames = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence', 'ricordello', 'treasure'];
-                }
+                let gameName;
                 
-                const gameName = availableGames[Math.floor(Math.random() * availableGames.length)];
+                // Se è un Test, fissa il minigioco scelto
+                if (localState.settings.isTestMode) {
+                    gameName = localState.settings.isTestMode;
+                } else {
+                    // Scegli gioco casuale compatibile col numero di giocatori
+                    let availableGames = MINIGAMES;
+                    if(selectedIds.length === 3) {
+                        availableGames = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence', 'ricordello', 'treasure'];
+                    }
+                    gameName = availableGames[Math.floor(Math.random() * availableGames.length)];
+                }
                 
                 // Init stato specifico del gioco
                 const minigameState = minigamesEngine.hostInit(gameName, selectedIds);
@@ -1629,10 +1707,10 @@
                     title: "Caccia al Tesoro",
                     desc: "Trova la chiave (penalità 3s), poi decifra la cassaforte (penalità 2s)!",
                     init(pIds) {
-                        const emojis = ['⭕', '🟥', '🔺', '⭐', '☂️', '🏠', '🚗', '🐶'];
+                        const emojis = ['⭕', '🟥', '🔺', '⭐', '☂️', '🏠', '🚗', '🐶', '🐱', '😢'];
                         let players = {};
                         pIds.forEach(id => {
-                            let combo = ui.shuffle([...emojis]).slice(0, 4); // 4 figure diverse da indovinare
+                            let combo = ui.shuffle([...emojis]).slice(0, 8); // 8 figure diverse da indovinare
                             let keyIndex = Math.floor(Math.random() * 25); // Posizione chiave (5x5)
                             players[id] = {
                                 keyIndex: keyIndex,
@@ -1658,7 +1736,7 @@
                             
                             let statusText = '';
                             if(myData.finished) statusText = '✅ SALVO';
-                            else if(myData.keyFound) statusText = `🔐 ${myData.comboProgress}/4`;
+                            else if(myData.keyFound) statusText = `🔐 ${myData.comboProgress}/8`;
                             else statusText = `🗝️ Ricerca...`;
                             
                             return `
@@ -1716,10 +1794,10 @@
                                     html += `</div>`;
                                 } else {
                                     html += `<div class="flex flex-col items-center justify-center w-48 h-48 bg-slate-900 p-2 rounded-xl shadow-inner border border-slate-700">
-                                                <div class="flex gap-1 mb-4">`;
-                                    for(let i=0; i<4; i++) {
+                                                <div class="flex flex-wrap justify-center w-full gap-1 mb-4 px-2">`;
+                                    for(let i=0; i<8; i++) {
                                         let isUnlocked = i < pData.comboProgress;
-                                        html += `<div class="w-8 h-8 flex items-center justify-center text-sm rounded border ${isUnlocked ? 'bg-green-900 border-green-500 text-green-400 shadow-[0_0_10px_#22c55e]' : 'bg-slate-800 border-slate-600'}">
+                                        html += `<div class="w-8 h-8 flex items-center justify-center text-xs md:text-sm rounded border ${isUnlocked ? 'bg-green-900 border-green-500 text-green-400 shadow-[0_0_10px_#22c55e]' : 'bg-slate-800 border-slate-600'}">
                                                     ${isUnlocked ? pData.combo[i] : '🔒'}
                                                  </div>`;
                                     }
@@ -1765,19 +1843,19 @@
                             } 
                             else {
                                 html += `<h3 class="text-xl text-blue-400 font-bold mb-4">Decifra la Cassaforte!</h3>
-                                         <div class="flex gap-2 mb-6">`;
-                                // Visualizza slot cassaforte
-                                for(let i=0; i<4; i++) {
+                                         <div class="flex flex-wrap justify-center max-w-sm md:max-w-md gap-2 mb-6">`;
+                                // Visualizza slot cassaforte (ora 8)
+                                for(let i=0; i<8; i++) {
                                     let isUnlocked = i < myData.comboProgress;
-                                    html += `<div class="w-12 h-12 md:w-16 md:h-16 flex items-center justify-center text-2xl md:text-3xl rounded-xl border-2 ${isUnlocked ? 'bg-green-900 border-green-500 text-green-400 shadow-[0_0_15px_#22c55e]' : 'bg-slate-800 border-slate-600'}">
+                                    html += `<div class="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-xl md:text-2xl rounded-xl border-2 ${isUnlocked ? 'bg-green-900 border-green-500 text-green-400 shadow-[0_0_15px_#22c55e]' : 'bg-slate-800 border-slate-600'}">
                                                 ${isUnlocked ? myData.combo[i] : '🔒'}
                                              </div>`;
                                 }
-                                html += `</div><div class="grid grid-cols-4 gap-2 md:gap-3">`;
-                                // Tastierino Figure
-                                const emojis = ['⭕', '🟥', '🔺', '⭐', '☂️', '🏠', '🚗', '🐶'];
+                                html += `</div><div class="grid grid-cols-5 gap-2 md:gap-3">`;
+                                // Tastierino Figure (ora 10 in 2 righe da 5)
+                                const emojis = ['⭕', '🟥', '🔺', '⭐', '☂️', '🏠', '🚗', '🐶', '🐱', '😢'];
                                 emojis.forEach(emoji => {
-                                    html += `<button class="w-12 h-12 md:w-16 md:h-16 text-2xl md:text-3xl bg-slate-700 hover:bg-blue-600 rounded-xl shadow border border-slate-600 active:scale-95 active:bg-blue-500 transition-all select-none touch-none"
+                                    html += `<button class="w-10 h-10 md:w-14 md:h-14 text-xl md:text-2xl bg-slate-700 hover:bg-blue-600 rounded-xl shadow border border-slate-600 active:scale-95 active:bg-blue-500 transition-all select-none touch-none"
                                                      onpointerdown="if(!${isBlocked}) { event.preventDefault(); actions.treasure_safe_click('${emoji}'); }">${emoji}</button>`;
                                 });
                                 html += `</div>`;
@@ -1811,10 +1889,10 @@
                             }
                         } else {
                             // Decifra cassaforte
-                            const emojis = ['⭕', '🟥', '🔺', '⭐', '☂️', '🏠', '🚗', '🐶'];
+                            const emojis = ['⭕', '🟥', '🔺', '⭐', '☂️', '🏠', '🚗', '🐶', '🐱', '😢'];
                             let choice = emojis[Math.floor(Math.random() * emojis.length)];
                             
-                            // I BOT hanno il 35% di possibilità di "ricordarsi" la mossa esatta per non metterci una vita intera, il resto è a caso (che equivale ad un ulteriore 12%)
+                            // I BOT hanno il 35% di possibilità di "ricordarsi" la mossa esatta per non metterci una vita intera, il resto è a caso
                             if(Math.random() < 0.35) {
                                 choice = myData.combo[myData.comboProgress];
                             }
@@ -2171,7 +2249,7 @@
                     newPlayers[uid].comboProgress++;
                     audioEngine.playCorrect(newPlayers[uid].comboProgress);
                     
-                    if(newPlayers[uid].comboProgress >= 4) {
+                    if(newPlayers[uid].comboProgress >= 8) {
                         newPlayers[uid].finished = true;
                         newFinishedPlayers.push(uid);
                         audioEngine.playWin();
@@ -2519,23 +2597,25 @@
                                 }, 1000 + Math.random()*3000); // Simuliamo che il bot "pensi" un po' prima di scegliere la combinazione
                             }
                         } else if(gm.currentMinigame === 'treasure') {
-                            let botData = gm.minigameState.players ? gm.minigameState.players[npc.uid] : {};
-                            
-                            // Il bot fa una mossa solo se non è in cooldown (e se il gioco non è già finito)
-                            if(botData && Date.now() >= (botData.clickUnlockTime || 0) && !botData.finished) {
-                                // Questo HASH è la soluzione al bug: tiene traccia di QUANTI tentativi ha fatto il bot!
-                                let actionHash = `${gm.currentMinigame}_${gm.round}_atts${botData.attempts || 0}`;
-                                if (window.npcActionHashes[npc.uid] !== actionHash) {
-                                    window.npcActionHashes[npc.uid] = actionHash;
-                                    
-                                    // Leggero ritardo per renderli imperfetti
-                                    const delay = 300 + (botIndex * 400) + Math.random() * 600;
-                                    setTimeout(() => {
-                                        if (localState.gameState.phase === 'playing') {
-                                            minigame.npcTurn(localState.gameState.minigameState, pIds, npc.uid);
-                                        }
-                                    }, delay);
-                                }
+                            let actionHash = `${gm.currentMinigame}_${gm.round}_loop`;
+                            if (window.npcActionHashes['treasure_' + npc.uid] !== actionHash) {
+                                window.npcActionHashes['treasure_' + npc.uid] = actionHash;
+                                
+                                // FIX: Loop continuo indipendente per il bot in Caccia al Tesoro
+                                const treasureLoop = () => {
+                                    if (localState && localState.gameState && localState.gameState.currentMinigame === 'treasure' && 
+                                        localState.gameState.phase === 'playing' && 
+                                        localState.gameState.round === gm.round) {
+                                        
+                                        minigame.npcTurn(localState.gameState.minigameState, pIds, npc.uid);
+                                        
+                                        // Controlla ciclicamente se si è sbloccato (con fattore di ritardo umano)
+                                        setTimeout(treasureLoop, 600 + Math.random() * 400);
+                                    }
+                                };
+                                
+                                // Inizia con un piccolo ritardo sfalsato
+                                setTimeout(treasureLoop, 500 + (botIndex * 400) + Math.random() * 600);
                             }
                         } else {
                             // HASH UNIVERSALE per le azioni simultanee dei BOT: rileva esattamente i reset
@@ -2616,6 +2696,7 @@
         // ==========================================
         window.onload = () => {
             logic.initAuth();
+            ui.renderTestSelect(); // Pre-compila la griglia di test
             ui.showScreen('menu');
         };
 
