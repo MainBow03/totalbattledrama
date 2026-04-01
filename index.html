@@ -1642,7 +1642,8 @@
                                 comboProgress: 0,
                                 clickUnlockTime: 0,
                                 finished: false,
-                                lives: 1 // L'eliminazione viene decisa a fine gara
+                                lives: 1, // L'eliminazione viene decisa a fine gara
+                                attempts: 0 // Aggiunto per fixare definitivamente gli stalli del BOT
                             };
                         });
                         return { players, phase: 'playing', finishedPlayers: [] };
@@ -2132,6 +2133,7 @@
                 if(myData.keyFound || myData.clickUnlockTime > Date.now() || myData.gridRevealed[index]) return;
                 
                 let newPlayers = JSON.parse(JSON.stringify(state.players));
+                newPlayers[uid].attempts = (newPlayers[uid].attempts || 0) + 1; // Contatore tentativi essenziale per sbloccare i BOT
                 
                 if(index === myData.keyIndex) {
                     newPlayers[uid].keyFound = true;
@@ -2157,6 +2159,8 @@
                 if(!myData.keyFound || myData.finished || myData.clickUnlockTime > Date.now()) return;
                 
                 let newPlayers = JSON.parse(JSON.stringify(state.players));
+                newPlayers[uid].attempts = (newPlayers[uid].attempts || 0) + 1; // Contatore tentativi essenziale per sbloccare i BOT
+                
                 let expectedEmoji = myData.combo[myData.comboProgress];
                 
                 let newFinishedPlayers = [...state.finishedPlayers];
@@ -2519,7 +2523,8 @@
                             
                             // Il bot fa una mossa solo se non è in cooldown (e se il gioco non è già finito)
                             if(botData && Date.now() >= (botData.clickUnlockTime || 0) && !botData.finished) {
-                                let actionHash = `${gm.currentMinigame}_${gm.round}_kf${botData.keyFound}_cp${botData.comboProgress}_rev${botData.gridRevealed ? botData.gridRevealed.filter(x=>x).length : 0}`;
+                                // Questo HASH è la soluzione al bug: tiene traccia di QUANTI tentativi ha fatto il bot!
+                                let actionHash = `${gm.currentMinigame}_${gm.round}_atts${botData.attempts || 0}`;
                                 if (window.npcActionHashes[npc.uid] !== actionHash) {
                                     window.npcActionHashes[npc.uid] = actionHash;
                                     
