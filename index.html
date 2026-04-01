@@ -1474,7 +1474,13 @@
                         return { grid, standardEmoji, targetEmoji, players, phase: 'memorize', endTime: Date.now() + 5000 };
                     },
                     render(state, pIds) {
-                        this.renderHUD(state.players, pIds);
+                        if (state.phase === 'result') {
+                            // Mostriamo i punti invece delle vite durante la fase dei risultati!
+                            this.renderHUD(state.players, pIds, null, 'score', 'Punti', true);
+                        } else {
+                            this.renderHUD(state.players, pIds);
+                        }
+                        
                         const area = document.getElementById('minigame-render-area');
                         let timeLeft = Math.max(0, Math.ceil((state.endTime - Date.now())/1000));
                         let myData = state.players[user.uid] || { selected: [] };
@@ -1537,8 +1543,8 @@
                                     else standardIndices.push(idx);
                                 });
                                 
-                                // Il bot indovina da 4 a 6 mattonelle esatte, le altre le sbaglia
-                                let correctCount = Math.floor(Math.random() * 3) + 4; 
+                                // Il bot indovina da 2 a 7 mattonelle esatte, le altre le sbaglia
+                                let correctCount = Math.floor(Math.random() * 6) + 2; 
                                 let botSelected = [];
                                 
                                 targetIndices = ui.shuffle(targetIndices);
@@ -1569,7 +1575,7 @@
                 game.render.call(this, state, pIds); // .call per passare il this
             },
 
-            renderHUD(playersState, pIds, highlightUid = null, statName = 'lives', statIcon = '❤️') {
+            renderHUD(playersState, pIds, highlightUid = null, statName = 'lives', statIcon = '❤️', showAsNumber = false) {
                 const hud = document.getElementById('minigame-players-hud');
                 if(!hud) return;
                 hud.innerHTML = pIds.map(uid => {
@@ -1578,11 +1584,16 @@
                     const val = stats[statName] || 0;
                     const charData = ui.getChar(p.charId);
                     const imgUrl = charData ? charData.url : '';
+                    
+                    let statHTML = showAsNumber 
+                        ? `<span class="text-sm font-bold text-yellow-400 mt-1">${val} ${statIcon}</span>`
+                        : `<div class="flex gap-1 text-sm md:text-base mt-1">${String(statIcon).repeat(Math.max(0, val))}</div>`;
+
                     return `
                         <div class="flex flex-col items-center bg-slate-900 px-4 py-3 rounded-lg border ${uid === highlightUid ? 'border-green-500 shadow-[0_0_10px_#10b981] scale-105 transition-transform' : 'border-slate-700'} relative">
-                            <img src="${imgUrl}" class="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover mb-2 border-2 ${uid === highlightUid ? 'border-green-500' : 'border-slate-600'}">
-                            <span class="text-xs font-bold text-white mb-1">${p.name}</span>
-                            <div class="flex gap-1 text-sm md:text-base">${String(statIcon).repeat(Math.max(0, val))}</div>
+                            <img src="${imgUrl}" class="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover mb-1 border-2 ${uid === highlightUid ? 'border-green-500' : 'border-slate-600'}">
+                            <span class="text-xs font-bold text-white">${p.name}</span>
+                            ${statHTML}
                         </div>
                     `;
                 }).join('');
@@ -1609,10 +1620,45 @@
             // --- AZIONE SPECIALE HOST: FORZA RISOLUZIONE (Evita stalli bot) ---
             async force_resolve() {
                 if(!isHost || localState.gameState.phase !== 'playing') return;
-                const pIds = localState.gameState.selectedPlayers;
+                const gm = localState.gameState;
+                const pIds = gm.selectedPlayers;
+                const state = gm.minigameState;
+
                 if(pIds && pIds.length > 0) {
-                    const randomLoser = pIds[Math.floor(Math.random() * pIds.length)];
-                    await hostEngine.resolveGame([randomLoser]);
+                    let targetLoser = null;
+
+                    // 1. Identifica il giocatore bloccato nei giochi a turni
+                    if (state.turnIndex !== undefined && pIds[state.turnIndex]) {
+                        targetLoser = pIds[state.turnIndex];
+                    } 
+                    // 2. Identifica chi non ha lanciato i dadi
+                    else if (gm.currentMinigame === 'dice' && state.players) {
+                        targetLoser = pIds.find(id => state.players[id] && state.players[id].roll === null);
+                    }
+                    // 3. Identifica chi non ha premuto in reaction
+                    else if (gm.currentMinigame === 'reaction') {
+                        targetLoser = pIds.find(id => state.winner !== id);
+                    }
+
+                    // Se non c'è un colpevole chiaro (giochi simultanei) o per proteggere un umano, 
+                    // cerca di puntare a un BOT tra i giocatori sfidati
+                    const pObj = targetLoser ? localState.players.find(p => p.uid === targetLoser) : null;
+                    if (!targetLoser || (pObj && !pObj.isNpc)) {
+                        const npcChallengers = pIds.filter(id => {
+                            const p = localState.players.find(x => x.uid === id);
+                            return p && p.isNpc;
+                        });
+                        if (npcChallengers.length > 0) {
+                            targetLoser = npcChallengers[Math.floor(Math.random() * npcChallengers.length)];
+                        }
+                    }
+
+                    // Fallback finale a caso tra i partecipanti se proprio non c'è scelta
+                    if (!targetLoser) {
+                        targetLoser = pIds[Math.floor(Math.random() * pIds.length)];
+                    }
+
+                    await hostEngine.resolveGame([targetLoser]);
                 }
             },
 
@@ -1766,7 +1812,7 @@
                         if (pIds.length - newState.winners.length <= 1) {
                             // C'è solo 1 perdente rimasto!
                             const loser = pIds.find(id => !newState.winners.includes(id));
-                            setTimeout(() => hostEngine.resolveGame([loser]), 1000); // Rimosso if (isHost) per evitare stalli se vince un client non-host
+                            if (isHost) setTimeout(() => hostEngine.resolveGame([loser]), 1000);
                             newState.phase = 'won';
                         } else {
                             // C'è ancora più di un giocatore a rischio (caso 3 giocatori originali). Resetta e continua
