@@ -1206,21 +1206,23 @@
                         
                         let isParticipant = pIds.includes(user.uid);
                         let isGreen = Date.now() >= state.triggerTime;
+                        window.isReactionGreen = isGreen; // Inizializza lo stato visivo per il fix della latenza
 
                         area.innerHTML = `
                             <button id="reaction-btn" 
-                                class="w-64 h-64 rounded-full font-black text-4xl shadow-2xl transition-colors duration-75 
+                                class="w-64 h-64 rounded-full font-black text-4xl shadow-2xl transition-colors duration-75 select-none touch-none
                                 ${isGreen ? 'bg-green-500 text-white cursor-pointer active:scale-95' : 'bg-red-500 text-red-900 cursor-not-allowed'}"
-                                onclick="if(${isParticipant}) actions.reaction_click()">
+                                onpointerdown="if(${isParticipant}) { event.preventDefault(); actions.reaction_click(); }">
                                 ${isGreen ? 'CLICCA ORA!' : 'ATTENDI...'}
                             </button>
                         `;
 
-                        // Client-side visual update if waiting (doesn't write to DB)
+                        // Client-side visual update: Questo timer è puramente per l'occhio dell'umano.
                         if(state.status === 'waiting' && !isGreen) {
                             const timeToWait = state.triggerTime - Date.now();
                             if(timeToWait > 0) {
                                 setTimeout(() => {
+                                    window.isReactionGreen = true; // Il bottone è fisicamente verde sul TUO schermo
                                     const btn = document.getElementById('reaction-btn');
                                     if(btn) { 
                                         btn.classList.replace('bg-red-500', 'bg-green-500'); 
@@ -1236,7 +1238,8 @@
                     npcTurn(state, pIds, currentUid) {
                         if(state.status === 'waiting' && state.triggerTime) {
                             const timeToWait = Math.max(0, state.triggerTime - Date.now());
-                            const reactionTime = 300 + Math.random() * 500; // Tempo di reazione del bot 300-800ms
+                            // NERF AI BOT: Tempo di reazione aumentato a 600-1200 millisecondi per dare una chance enorme agli umani!
+                            const reactionTime = 600 + Math.random() * 600; 
                             setTimeout(() => {
                                 // Ricontrolla che nel frattempo il bottone sia diventato verde e non sia finito il round
                                 if(localState.gameState.minigameState.status === 'waiting') {
@@ -1264,7 +1267,7 @@
                             <div class="flex flex-col items-center">
                                 <div class="text-6xl font-black text-yellow-400 mb-8">${timeLeft}s</div>
                                 ${state.phase === 'playing' && pIds.includes(user.uid) ? 
-                                `<button onclick="actions.mash_click()" class="bg-purple-600 hover:bg-purple-500 active:bg-purple-800 w-48 h-48 rounded-full text-3xl font-bold shadow-[0_10px_0_#4c1d95] active:translate-y-2 active:scale-95 active:shadow-none transition-all">MASH!</button>`
+                                `<button onpointerdown="event.preventDefault(); actions.mash_click()" class="bg-purple-600 hover:bg-purple-500 active:bg-purple-800 w-48 h-48 rounded-full text-3xl font-bold shadow-[0_10px_0_#4c1d95] active:translate-y-2 active:scale-95 active:shadow-none transition-all select-none touch-none">MASH!</button>`
                                 : '<div class="text-slate-500 text-xl">Spettatore</div>'}
                             </div>
                         `;
@@ -1511,7 +1514,7 @@
 
             // --- TILES ---
             async tiles_click(index, overrideUid = null) {
-                const uid = overrideUid || user.uid;
+                const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
                 let state = localState.gameState.minigameState;
                 if(localState.gameState.phase !== 'playing') return;
                 if(localState.gameState.selectedPlayers[state.turnIndex] !== uid) return;
@@ -1543,7 +1546,7 @@
 
             // --- DICE ---
             async dice_roll(overrideUid = null) {
-                const uid = overrideUid || user.uid;
+                const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
                 let state = localState.gameState.minigameState;
                 
                 if(localState.gameState.phase !== 'playing' || state.phase !== 'rolling') return;
@@ -1564,11 +1567,12 @@
 
             // --- REACTION ---
             async reaction_click(overrideUid = null) {
-                const uid = overrideUid || user.uid;
+                const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
                 let state = localState.gameState.minigameState;
                 if(localState.gameState.phase !== 'playing' || state.status !== 'waiting') return; // already clicked
 
-                if(Date.now() >= state.triggerTime) {
+                // Accetta il clic se il tempo logico è scaduto (per i bot) OPPURE se il bottone era verde fisicamente per l'umano (elimina bug di fusi orari/latenza)
+                if(Date.now() >= state.triggerTime - 500 || window.isReactionGreen) {
                     // Vittoria istantanea per chi clicca per primo sul verde!
                     await this.updateState({
                         ...state,
@@ -1580,21 +1584,21 @@
 
             // --- MASH ---
             async mash_click(overrideUid = null, amt = 1) {
-                const uid = overrideUid || user.uid;
+                const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
                 let state = localState.gameState.minigameState;
                 
                 // Safety check contro il TypeError quando i dati non sono ancora sincronizzati
                 if(!state || state.phase !== 'playing' || !state.players || !state.players[uid]) return;
                 
                 let newPlayers = JSON.parse(JSON.stringify(state.players));
-                newPlayers[uid].clicks += amt;
+                newPlayers[uid].clicks += (typeof amt === 'number' ? amt : 1);
                 
                 await this.updateState({ ...state, players: newPlayers });
             },
 
             // --- VOTING ---
             async voting_vote(targetId, overrideUid = null) {
-                const uid = overrideUid || user.uid;
+                const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
                 let state = localState.gameState.minigameState;
                 
                 if(localState.gameState.phase !== 'playing' || state.phase !== 'voting') return;
@@ -1617,7 +1621,7 @@
 
             // --- BOMB ---
             async bomb_pass(overrideUid = null) {
-                const uid = overrideUid || user.uid;
+                const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
                 let state = localState.gameState.minigameState;
                 if(localState.gameState.phase !== 'playing' || state.phase !== 'playing') return;
                 
@@ -1625,12 +1629,12 @@
                 if(pIds[state.turnIndex] !== uid) return;
                 
                 let nextIdx = (state.turnIndex + 1) % pIds.length;
-                await this.updateState({ ...state, turnIndex: nextIdx });
+                await this.updateState({ ...state, turnIndex: nextIdx, passes: (state.passes || 0) + 1 });
             },
 
             // --- SEQUENCE ---
             async sequence_click(index, overrideUid = null) {
-                const uid = overrideUid || user.uid;
+                const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
                 let state = localState.gameState.minigameState;
                 const pIds = localState.gameState.selectedPlayers;
                 
@@ -1768,7 +1772,8 @@
                             } else {
                                 // Reset rolls per prossimo round
                                 for(let key in newPlayers) newPlayers[key].roll = null;
-                                await actions.updateState({...s, players: newPlayers, phase: 'rolling'});
+                                let newSubRound = (s.subRound || 0) + 1;
+                                await actions.updateState({...s, players: newPlayers, phase: 'rolling', subRound: newSubRound});
                             }
                         }, 2500);
                     }
@@ -1876,7 +1881,11 @@
                     
                     if(p && p.isNpc) {
                         // Crea un hash univoco per questo esatto stato del turno
-                        let stateHash = gm.currentMinigame + "_" + gm.round + "_" + turnIdx + "_" + (gm.minigameState.progress || 0) + "_" + (gm.minigameState.errorIndex !== null ? gm.minigameState.errorIndex : 'none');
+                        let revealedCount = gm.minigameState.tiles ? gm.minigameState.tiles.filter(t=>t.revealed).length : 0;
+                        let bombPasses = gm.minigameState.passes || 0;
+                        let seqHash = gm.minigameState.sequence ? gm.minigameState.sequence.join('') : '';
+                        
+                        let stateHash = `${gm.currentMinigame}_${gm.round}_turn${turnIdx}_prog${gm.minigameState.progress || 0}_err${gm.minigameState.errorIndex !== null ? gm.minigameState.errorIndex : 'none'}_rev${revealedCount}_pass${bombPasses}_seq${seqHash}`;
                         
                         if (window.npcActionHashes['turn'] !== stateHash) {
                             window.npcActionHashes['turn'] = stateHash;
@@ -1917,7 +1926,8 @@
                             // HASH UNIVERSALE per le azioni simultanee dei BOT: rileva esattamente i reset
                             let botData = gm.minigameState.players ? gm.minigameState.players[npc.uid] : {};
                             let botVote = gm.minigameState.votes ? gm.minigameState.votes[npc.uid] : null;
-                            let actionHash = `${gm.currentMinigame}_${gm.round}_${gm.minigameState.phase}_${gm.minigameState.status}_${gm.minigameState.triggerTime}_${JSON.stringify(botData)}_${botVote}`;
+                            let subRound = gm.minigameState.subRound || 0;
+                            let actionHash = `${gm.currentMinigame}_${gm.round}_sub${subRound}_${gm.minigameState.phase}_${gm.minigameState.status}_${gm.minigameState.triggerTime}_${JSON.stringify(botData)}_${botVote}`;
                             
                             if (window.npcActionHashes[npc.uid] !== actionHash) {
                                 window.npcActionHashes[npc.uid] = actionHash;
