@@ -168,7 +168,11 @@
                 <h2 class="text-lg font-bold text-blue-400">Round <span id="game-round-number">1</span></h2>
                 <p class="text-xs text-slate-300">Vivi: <span id="game-alive-count">0</span> | Sfida a: <span id="game-challenge-type">3</span></p>
             </div>
-            <div id="game-phase-indicator" class="font-bold text-yellow-400 uppercase tracking-widest">Attesa...</div>
+            <div class="flex items-center">
+                <div id="game-phase-indicator" class="font-bold text-yellow-400 uppercase tracking-widest">Attesa...</div>
+                <!-- Pulsante Emergenza Host per sbloccare i bot -->
+                <button id="btn-force-resolve" onclick="actions.force_resolve()" class="hidden bg-red-600 hover:bg-red-500 text-xs px-3 py-1 rounded text-white font-bold ml-4 transition-colors border border-red-400 shadow-[0_0_8px_#ef4444]">⚡ SIMULA SFIDA</button>
+            </div>
         </div>
 
         <!-- Main Game Area -->
@@ -772,7 +776,7 @@
                     </div>
                 `).join('');
 
-                // Sidebar Top 3 Vincitori
+                // Sidebar Destra: Top 3 Vincitori
                 const topWinners = [...localState.players]
                     .filter(p => p.stats.wins > 0)
                     .sort((a, b) => b.stats.wins - a.stats.wins)
@@ -796,7 +800,7 @@
                     }
                 }
 
-                // Sidebar Eliminati
+                // Sidebar Destra: Eliminati
                 const dead = localState.players.filter(p => !p.isAlive).sort((a,b) => b.stats.order - a.stats.order);
                 const deadListEl = document.getElementById('game-dead-list');
                 if(deadListEl) {
@@ -818,6 +822,14 @@
                         </div>
                     `).join('');
                     chatEl.scrollTop = chatEl.scrollHeight;
+                }
+
+                // Tasto Simula Sfida (solo Host, solo durante minigioco)
+                const btnForce = document.getElementById('btn-force-resolve');
+                if (isHost && gs.phase === 'playing') {
+                    btnForce.classList.remove('hidden');
+                } else {
+                    btnForce.classList.add('hidden');
                 }
 
                 // Phase logic
@@ -1181,15 +1193,15 @@
                 },
 
                 reaction: {
-                    title: "Reaction Test",
-                    desc: "Clicca il pulsante quando diventa VERDE! Il primo a 3 punti è salvo.",
+                    title: "Test di Sopravvivenza (Reaction)",
+                    desc: "Basta UNA reazione valida per vincere. Il primo che clicca sul VERDE si salva!",
                     init(pIds) {
                         let players = {};
-                        pIds.forEach(id => players[id] = { points: 0 });
+                        pIds.forEach(id => players[id] = { lives: 0 }); // Nessuna vita mostrata, one-shot
                         return { players, status: 'waiting', triggerTime: Date.now() + 2000 + Math.random()*3000 };
                     },
                     render(state, pIds) {
-                        this.renderHUD(state.players, pIds, null, 'points', '⭐');
+                        this.renderHUD(state.players, pIds, null, 'fake', ''); // Mostra solo gli avatar senza vite
                         const area = document.getElementById('minigame-render-area');
                         
                         let isParticipant = pIds.includes(user.uid);
@@ -1200,7 +1212,7 @@
                                 class="w-64 h-64 rounded-full font-black text-4xl shadow-2xl transition-colors duration-75 
                                 ${isGreen ? 'bg-green-500 text-white cursor-pointer active:scale-95' : 'bg-red-500 text-red-900 cursor-not-allowed'}"
                                 onclick="if(${isParticipant}) actions.reaction_click()">
-                                ${isGreen ? 'CLICCA!' : 'ATTENDI...'}
+                                ${isGreen ? 'CLICCA ORA!' : 'ATTENDI...'}
                             </button>
                         `;
 
@@ -1215,7 +1227,7 @@
                                         btn.classList.replace('text-red-900', 'text-white'); 
                                         btn.classList.replace('cursor-not-allowed', 'cursor-pointer');
                                         btn.classList.add('active:scale-95');
-                                        btn.innerText = 'CLICCA!'; 
+                                        btn.innerText = 'CLICCA ORA!'; 
                                     }
                                 }, timeToWait);
                             }
@@ -1267,7 +1279,7 @@
                     npcTurn(state, pIds, currentUid) {
                         // Gli NPC cliccano "virtualmente" inviando un burst di click
                         if(state.phase === 'playing' && Math.random() > 0.5) {
-                            // Cliccano in modo competitivo: da 2 a 5 click ogni mezzo secondo (quindi da 4 a 10 click al secondo)
+                            // Cliccano in modo competitivo: da 2 a 5 click ogni mezzo secondo
                             actions.mash_click(currentUid, Math.floor(Math.random() * 4) + 2);
                         }
                     }
@@ -1487,6 +1499,16 @@
                 await updateDoc(logic.getRoomDoc(currentRoomId), { players: updatedPlayers });
             },
 
+            // --- AZIONE SPECIALE HOST: FORZA RISOLUZIONE (Evita stalli bot) ---
+            async force_resolve() {
+                if(!isHost || localState.gameState.phase !== 'playing') return;
+                const pIds = localState.gameState.selectedPlayers;
+                if(pIds && pIds.length > 0) {
+                    const randomLoser = pIds[Math.floor(Math.random() * pIds.length)];
+                    await hostEngine.resolveGame([randomLoser]);
+                }
+            },
+
             // --- TILES ---
             async tiles_click(index, overrideUid = null) {
                 const uid = overrideUid || user.uid;
@@ -1546,29 +1568,13 @@
                 let state = localState.gameState.minigameState;
                 if(localState.gameState.phase !== 'playing' || state.status !== 'waiting') return; // already clicked
 
-                // Check se ha cliccato troppo presto (rosso) - penalità opzionale, qui lo ignoro.
-                // Se status è waiting e tempo superato
                 if(Date.now() >= state.triggerTime) {
-                    let newPlayers = JSON.parse(JSON.stringify(state.players));
-                    newPlayers[uid].points++;
-                    
-                    if(newPlayers[uid].points >= 3) {
-                        // Segna il round come finito a livello di stato, l'Host lo risolverà
-                        await this.updateState({
-                            ...state,
-                            players: newPlayers,
-                            status: 'finished',
-                            winner: uid
-                        });
-                    } else {
-                        // Nuovo round reaction
-                        await this.updateState({
-                            ...state,
-                            players: newPlayers,
-                            status: 'waiting',
-                            triggerTime: Date.now() + 2000 + Math.random()*3000
-                        });
-                    }
+                    // Vittoria istantanea per chi clicca per primo sul verde!
+                    await this.updateState({
+                        ...state,
+                        status: 'finished',
+                        winner: uid
+                    });
                 }
             },
 
@@ -1576,7 +1582,9 @@
             async mash_click(overrideUid = null, amt = 1) {
                 const uid = overrideUid || user.uid;
                 let state = localState.gameState.minigameState;
-                if(state.phase !== 'playing') return;
+                
+                // Safety check contro il TypeError quando i dati non sono ancora sincronizzati
+                if(!state || state.phase !== 'playing' || !state.players || !state.players[uid]) return;
                 
                 let newPlayers = JSON.parse(JSON.stringify(state.players));
                 newPlayers[uid].clicks += amt;
@@ -1650,7 +1658,7 @@
                         if (pIds.length - newState.winners.length <= 1) {
                             // C'è solo 1 perdente rimasto!
                             const loser = pIds.find(id => !newState.winners.includes(id));
-                            setTimeout(() => hostEngine.resolveGame([loser]), 1000);
+                            if (isHost) setTimeout(() => hostEngine.resolveGame([loser]), 1000);
                             newState.phase = 'won';
                         } else {
                             // C'è ancora più di un giocatore a rischio (caso 3 giocatori originali). Resetta e continua
@@ -1800,29 +1808,45 @@
 
                 // 3. Bomba (BOMB) Timer check
                 if (gm.currentMinigame === 'bomb' && gm.minigameState.phase === 'playing') {
-                    if (Date.now() >= gm.minigameState.endTime) {
-                        // Esplosione!
-                        const loserId = gm.selectedPlayers[gm.minigameState.turnIndex];
-                        actions.updateState({ ...gm.minigameState, phase: 'exploded' });
-                        audioEngine.playExplosion();
-                        
-                        setTimeout(() => {
-                            hostEngine.resolveGame([loserId]);
-                        }, 2000);
-                        return; // Ferma tutto
+                    if (!window.bombHostChecker) {
+                        window.bombHostChecker = setInterval(() => {
+                            if (localState.gameState.currentMinigame !== 'bomb' || localState.gameState.minigameState.phase !== 'playing') {
+                                clearInterval(window.bombHostChecker);
+                                window.bombHostChecker = null;
+                                return;
+                            }
+                            if (Date.now() >= localState.gameState.minigameState.endTime) {
+                                clearInterval(window.bombHostChecker);
+                                window.bombHostChecker = null;
+                                
+                                const loserId = localState.gameState.selectedPlayers[localState.gameState.minigameState.turnIndex];
+                                actions.updateState({ ...localState.gameState.minigameState, phase: 'exploded' });
+                                audioEngine.playExplosion();
+                                
+                                setTimeout(() => {
+                                    hostEngine.resolveGame([loserId]);
+                                }, 2000);
+                            }
+                        }, 500);
                     }
                 }
 
                 // 4. Ordine Numerico (SEQUENCE) Error Reset
                 if (gm.currentMinigame === 'sequence' && gm.minigameState.phase === 'showing_error') {
                     // Aspetta 1.5 secondi per far memorizzare l'errore a tutti, poi cambia turno
-                    if (Date.now() - gm.minigameState.errorTime >= 1500) {
-                        let s = gm.minigameState;
-                        let nextTurn = (s.turnIndex + 1) % gm.selectedPlayers.length;
-                        while(s.winners.includes(gm.selectedPlayers[nextTurn])) {
-                            nextTurn = (nextTurn + 1) % gm.selectedPlayers.length;
-                        }
-                        actions.updateState({ ...s, phase: 'playing', errorIndex: null, progress: 0, turnIndex: nextTurn });
+                    if (!oldState.gameState.minigameState || oldState.gameState.minigameState.phase !== 'showing_error') {
+                        setTimeout(() => {
+                            let s = localState.gameState.minigameState;
+                            if(localState.gameState.phase !== 'playing' || s.phase !== 'showing_error') return;
+                            
+                            let nextTurn = (s.turnIndex + 1) % localState.gameState.selectedPlayers.length;
+                            let safeCounter = 0;
+                            while(s.winners.includes(localState.gameState.selectedPlayers[nextTurn]) && safeCounter < 10) {
+                                nextTurn = (nextTurn + 1) % localState.gameState.selectedPlayers.length;
+                                safeCounter++;
+                            }
+                            actions.updateState({ ...s, phase: 'playing', errorIndex: null, progress: 0, turnIndex: nextTurn });
+                        }, 1500);
                     }
                     return; // Durante l'errore nessuno agisce
                 }
@@ -1865,7 +1889,7 @@
                         }
                     }
                 }
-                // Giochi simultanei
+                // Giochi simultanei (Dadi, Reaction, Mash, Votazione)
                 else {
                     let pNpcs = state.players.filter(x => pIds.includes(x.uid) && x.isNpc);
                     
@@ -1874,30 +1898,38 @@
                         pNpcs = state.players.filter(x => x.isAlive && !pIds.includes(x.uid) && x.isNpc);
                     }
 
-                    pNpcs.forEach(npc => {
+                    pNpcs.forEach((npc, botIndex) => {
                         if(gm.currentMinigame === 'mash') {
                             let mashHash = gm.round + "_mash";
                             if (window.npcActionHashes['mash_' + npc.uid] !== mashHash) {
                                 window.npcActionHashes['mash_' + npc.uid] = mashHash;
-                                const id = setInterval(() => {
-                                    if (localState.gameState.currentMinigame === 'mash' && localState.gameState.minigameState.phase === 'playing') {
+                                
+                                // Nuova logica Mash per i bot che non va in crash e non usa intervalli bloccanti
+                                const mashLoop = () => {
+                                    if (localState.gameState.currentMinigame === 'mash' && localState.gameState.minigameState.phase === 'playing' && localState.gameState.round === gm.round) {
                                         minigame.npcTurn(localState.gameState.minigameState, pIds, npc.uid);
-                                    } else {
-                                        clearInterval(id);
+                                        setTimeout(mashLoop, 500);
                                     }
-                                }, 500);
-                                npcLogicIntervals.push(id);
+                                };
+                                setTimeout(mashLoop, 500);
                             }
                         } else {
-                            let actionHash = gm.currentMinigame + "_" + gm.round + "_" + gm.minigameState.phase + "_" + (gm.minigameState.status || '');
+                            // HASH UNIVERSALE per le azioni simultanee dei BOT: rileva esattamente i reset
+                            let botData = gm.minigameState.players ? gm.minigameState.players[npc.uid] : {};
+                            let botVote = gm.minigameState.votes ? gm.minigameState.votes[npc.uid] : null;
+                            let actionHash = `${gm.currentMinigame}_${gm.round}_${gm.minigameState.phase}_${gm.minigameState.status}_${gm.minigameState.triggerTime}_${JSON.stringify(botData)}_${botVote}`;
                             
                             if (window.npcActionHashes[npc.uid] !== actionHash) {
                                 window.npcActionHashes[npc.uid] = actionHash;
+                                
+                                // Scaglionamento (Staggering) dei bot per evitare collisioni di scritture (race conditions)
+                                const delay = 500 + (botIndex * 1200) + Math.random() * 800;
+                                
                                 setTimeout(() => {
                                     if (localState.gameState.phase === 'playing') {
                                         minigame.npcTurn(localState.gameState.minigameState, pIds, npc.uid);
                                     }
-                                }, 500 + Math.random()*2000);
+                                }, delay);
                             }
                         }
                     });
