@@ -79,14 +79,14 @@
         <div class="flex flex-col md:flex-row gap-8 w-full max-w-5xl justify-center items-stretch">
             
             <!-- Box Menu Principale -->
-            <div class="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <div class="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md flex flex-col justify-center">
                 <div class="mb-6">
                     <label class="block text-sm font-medium text-slate-300 mb-2">Scegli il tuo Nickname</label>
                     <input type="text" id="input-nickname" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500" placeholder="Es. Player123" maxlength="15">
                 </div>
                 <div class="space-y-4">
-                    <button onclick="ui.showScreen('create')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Crea Stanza (Host)</button>
-                    <button onclick="ui.showScreen('join')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Unisciti a una Stanza</button>
+                    <button onclick="ui.showScreen('create')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg">Crea Stanza (Host)</button>
+                    <button onclick="ui.showScreen('join')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg">Unisciti a una Stanza</button>
                     <button onclick="ui.showScreen('test-select')" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg border border-orange-500">Prova Minigioco (Stanza Test)</button>
                 </div>
             </div>
@@ -97,7 +97,7 @@
                     🏆 Top 5 Scelti
                 </h3>
                 <p class="text-xs text-slate-400 text-center mb-4">I personaggi più giocati dagli umani in tutto il mondo.</p>
-                <div id="top-characters-list" class="flex flex-col gap-2 flex-1">
+                <div id="top-characters-list" class="flex flex-col gap-2 flex-1 justify-center">
                     <p class="text-sm text-slate-500 text-center py-4">Caricamento classifica...</p>
                 </div>
             </div>
@@ -433,7 +433,7 @@
             { id: 'c78', name: 'Terra', url: 'https://i.pinimg.com/736x/f4/8c/fe/f48cfe12b3e2418c2c2688eab0e66f3d.jpg' }
         ];
 
-        const MINIGAMES = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence', 'ricordello', 'treasure', 'shell'];
+        const MINIGAMES = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence', 'ricordello', 'treasure', 'shell', 'connect4'];
 
         // ==========================================
         // AUDIO ENGINE (Sintetizzatore nativo)
@@ -1568,6 +1568,7 @@
                 });
             }
         };
+        window.hostEngine = hostEngine;
 
         // ==========================================
         // MINIGAMES ENGINE (Render & Logica Condivisa)
@@ -1724,39 +1725,80 @@
                 },
 
                 mash: {
-                    title: "Button Mash",
-                    desc: "Clicca più veloce che puoi in 10 secondi! Chi fa meno click perde 1 vita.",
+                    title: "Sprint Finale (Mash)",
+                    desc: "Premi veloce per riempire la barra! ATTENZIONE: fermati subito col semaforo ROSSO o perdi tutto!",
                     init(pIds) {
                         let players = {};
-                        pIds.forEach(id => players[id] = { clicks: 0, lives: 2 });
-                        return { players, endTime: Date.now() + 10000, phase: 'playing' };
+                        pIds.forEach(id => players[id] = { progress: 0, lives: 2 });
+                        return { 
+                            players, 
+                            endTime: Date.now() + 20000, 
+                            phase: 'playing',
+                            light: 'GREEN',
+                            nextLightChange: Date.now() + 2000 + Math.random() * 3000
+                        };
                     },
                     render(state, pIds) {
-                        this.renderHUD(state.players, pIds);
+                        this.renderHUD(state.players, pIds, null, 'lives', '❤️');
                         const area = document.getElementById('minigame-render-area');
                         let timeLeft = Math.max(0, Math.ceil((state.endTime - Date.now())/1000));
                         
+                        const isGreen = state.light === 'GREEN';
+                        const lightClass = isGreen ? 'text-green-500' : 'text-red-500';
+                        const lightText = isGreen ? '🟢 CORRI!' : '🔴 FERMI!';
+                        
+                        let barsHTML = pIds.map(uid => {
+                            const p = localState.players.find(x => x.uid === uid);
+                            const prog = state.players[uid]?.progress || 0;
+                            const isMe = uid === user.uid;
+                            return `
+                                <div class="flex flex-col items-center gap-3">
+                                    <div class="w-12 md:w-16 h-48 bg-slate-900 rounded-full border-4 border-slate-700 relative overflow-hidden flex flex-col justify-end shadow-inner">
+                                        <div class="w-full ${isMe ? 'bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.8)]' : 'bg-orange-500'} transition-all duration-200" style="height: ${prog}%"></div>
+                                    </div>
+                                    <img src="${ui.getChar(p.charId).url}" class="w-10 h-10 rounded-full border-2 border-slate-500 object-cover">
+                                    <span class="text-xs font-bold text-white truncate max-w-[60px] text-center">${p.name}</span>
+                                </div>
+                            `;
+                        }).join('');
+
                         area.innerHTML = `
-                            <div class="flex flex-col items-center">
-                                <div class="text-6xl font-black text-yellow-400 mb-8">${timeLeft}s</div>
+                            <div class="flex flex-col items-center w-full">
+                                <div class="text-5xl md:text-6xl font-black ${lightClass} mb-2 drop-shadow-lg ${isGreen ? '' : 'animate-pulse'}">${lightText}</div>
+                                <div class="text-lg text-slate-300 mb-6 font-mono bg-slate-800 px-4 py-1 rounded-full border border-slate-600">⏱️ ${timeLeft}s</div>
+                                
+                                <div class="flex gap-6 md:gap-12 justify-center mb-8 w-full items-end">
+                                    ${barsHTML}
+                                </div>
+                                
                                 ${state.phase === 'playing' && pIds.includes(user.uid) ? 
-                                `<button onpointerdown="event.preventDefault(); actions.mash_click()" class="bg-purple-600 hover:bg-purple-500 active:bg-purple-800 w-48 h-48 rounded-full text-3xl font-bold shadow-[0_10px_0_#4c1d95] active:translate-y-2 active:scale-95 active:shadow-none transition-all select-none touch-none">MASH!</button>`
-                                : '<div class="text-slate-500 text-xl">Spettatore</div>'}
+                                `<button onpointerdown="event.preventDefault(); actions.mash_click()" 
+                                         class="bg-purple-600 hover:bg-purple-500 active:bg-purple-800 w-32 h-32 md:w-40 md:h-40 rounded-full text-2xl md:text-3xl font-bold shadow-[0_10px_0_#4c1d95] active:translate-y-2 active:scale-95 active:shadow-none transition-all select-none touch-none">
+                                    PREMI!
+                                </button>`
+                                : '<div class="text-slate-500 text-xl italic mt-10">Modalità Spettatore</div>'}
                             </div>
                         `;
-                        // Aggiorna timer UI locale
+
+                        // Timer rapido per animare fluide le barre in locale
                         if(state.phase === 'playing' && !window.mashInterval) {
                             window.mashInterval = setInterval(() => {
                                 if(localState.gameState.currentMinigame !== 'mash') { clearInterval(window.mashInterval); window.mashInterval=null; return; }
                                 logic.renderGame();
-                            }, 1000);
+                            }, 500);
                         }
                     },
                     npcTurn(state, pIds, currentUid) {
-                        // Gli NPC cliccano "virtualmente" inviando un burst di click
-                        if(state.phase === 'playing' && Math.random() > 0.5) {
-                            // Cliccano in modo competitivo: da 2 a 5 click ogni mezzo secondo
-                            actions.mash_click(currentUid, Math.floor(Math.random() * 4) + 2);
+                        if(state.phase === 'playing') {
+                            if (state.light === 'GREEN') {
+                                // Bot più performanti: 3 a 5 click per tick (6-10 click al secondo)
+                                actions.mash_click(currentUid, Math.floor(Math.random() * 3) + 3);
+                            } else {
+                                // Rischio di sbagliare quando è rosso (12% per tick)
+                                if (Math.random() < 0.12) {
+                                    actions.mash_click(currentUid, 1);
+                                }
+                            }
                         }
                     }
                 },
@@ -2399,6 +2441,142 @@
                             }
                         }
                     }
+                },
+
+                connect4: {
+                    title: "Forza 4",
+                    desc: "Metti 4 gettoni del tuo colore in fila (orizzontale, verticale o diagonale) per vincere e condannare gli altri!",
+                    init(pIds) {
+                        const isMulti = pIds.length >= 3;
+                        const cols = isMulti ? 9 : 7; // Griglia più grande per 3+ giocatori
+                        const rows = isMulti ? 7 : 6;
+                        let players = {};
+                        pIds.forEach(id => players[id] = { lives: 3 });
+                        return {
+                            board: Array(cols * rows).fill(null),
+                            cols, rows,
+                            turnIndex: 0,
+                            phase: 'playing',
+                            players
+                        };
+                    },
+                    render(state, pIds) {
+                        this.renderHUD(state.players, pIds, pIds[state.turnIndex]);
+                        const area = document.getElementById('minigame-render-area');
+                        const turnUid = pIds[state.turnIndex];
+                        const isMyTurn = turnUid === user.uid && state.phase === 'playing';
+
+                        // Colori per i diversi giocatori (Rosso, Giallo, Verde, Viola, ecc.)
+                        const colors = ['bg-red-500', 'bg-yellow-400', 'bg-green-500', 'bg-purple-500', 'bg-pink-500'];
+
+                        let html = `<div class="flex flex-col items-center w-full max-w-2xl overflow-x-auto">`;
+                        
+                        if (state.phase === 'playing') {
+                            const turnPlayerName = localState.players.find(p=>p.uid===turnUid).name;
+                            const turnColor = colors[pIds.indexOf(turnUid) % colors.length].replace('bg-', 'text-');
+                            html += `<div class="mb-4 text-center text-xl font-bold">
+                                Turno di: <span class="${turnColor} drop-shadow-md">${turnPlayerName}</span>
+                            </div>`;
+                        } else if (state.phase === 'ended') {
+                            html += `<div class="mb-4 text-center text-2xl font-black text-green-400 animate-pulse">Partita Terminata!</div>`;
+                        }
+
+                        // Disegna plancia Forza 4
+                        html += `<div class="flex flex-col items-center min-w-fit">`;
+                        html += `<div class="bg-blue-700 p-2 md:p-4 rounded-xl shadow-[0_10px_0_#1e3a8a] border-4 border-blue-900 mb-6 md:mb-8">
+                                    <div class="grid gap-1 md:gap-2" style="grid-template-columns: repeat(${state.cols}, minmax(0, 1fr));">`;
+
+                        for(let r = 0; r < state.rows; r++) {
+                            for(let c = 0; c < state.cols; c++) {
+                                const cellUid = state.board[r * state.cols + c];
+                                let pIndex = cellUid ? pIds.indexOf(cellUid) : -1;
+                                let colorClass = pIndex >= 0 ? colors[pIndex % colors.length] : 'bg-slate-900';
+                                let shadowClass = pIndex >= 0 ? 'shadow-[inset_0_4px_6px_rgba(0,0,0,0.4)] border-2 border-black/30' : 'shadow-[inset_0_4px_8px_rgba(0,0,0,0.6)]';
+
+                                html += `<div class="w-8 h-8 md:w-12 md:h-12 rounded-full ${colorClass} ${shadowClass} transition-colors duration-300 flex items-center justify-center"></div>`;
+                            }
+                        }
+                        
+                        html += `   </div>
+                                 </div>`;
+                                 
+                        // Bottoni per inserire il gettone (allineati perfettamente sotto ogni colonna)
+                        html += `<div class="grid gap-1 md:gap-2 px-2 md:px-4 border-4 border-transparent w-full" style="grid-template-columns: repeat(${state.cols}, minmax(0, 1fr));">`;
+                        for(let c = 0; c < state.cols; c++) {
+                            html += `<button class="w-8 h-10 md:w-12 md:h-12 flex items-center justify-center bg-slate-700 hover:bg-blue-500 rounded-lg font-bold text-white transition-colors ${!isMyTurn ? 'opacity-50 cursor-not-allowed' : 'active:bg-blue-400 active:scale-95 shadow-lg'}" onpointerdown="if(${isMyTurn}) { event.preventDefault(); actions.connect4_drop(${c}); }">⬆️</button>`;
+                        }
+                        html += `</div></div></div>`;
+                        area.innerHTML = html;
+                    },
+                    npcTurn(state, pIds, currentUid) {
+                        // AI del BOT: controlla se può vincere, poi se deve bloccare, poi gioca
+                        const cols = state.cols;
+                        const rows = state.rows;
+                        const board = state.board;
+
+                        function getAvailableRow(c) {
+                            for(let r = rows - 1; r >= 0; r--) {
+                                if(board[r * cols + c] === null) return r;
+                            }
+                            return -1;
+                        }
+
+                        function checkWinAI(b, r, c, targetUid) {
+                            const dirs = [[0,1], [1,0], [1,1], [1,-1]];
+                            for(let [dr, dc] of dirs) {
+                                let count = 1;
+                                for(let i=1; i<4; i++) {
+                                    let nr = r + dr*i, nc = c + dc*i;
+                                    if(nr>=0 && nr<rows && nc>=0 && nc<cols && b[nr*cols+nc] === targetUid) count++; else break;
+                                }
+                                for(let i=1; i<4; i++) {
+                                    let nr = r - dr*i, nc = c - dc*i;
+                                    if(nr>=0 && nr<rows && nc>=0 && nc<cols && b[nr*cols+nc] === targetUid) count++; else break;
+                                }
+                                if(count >= 4) return true;
+                            }
+                            return false;
+                        }
+
+                        let validCols = [];
+                        for(let c=0; c<cols; c++) {
+                            if(getAvailableRow(c) !== -1) validCols.push(c);
+                        }
+
+                        if(validCols.length === 0) return; 
+
+                        let bestCol = -1;
+
+                        // 1. Il Bot può vincere con questa mossa?
+                        for(let c of validCols) {
+                            let r = getAvailableRow(c);
+                            if(checkWinAI(board, r, c, currentUid)) { bestCol = c; break; }
+                        }
+
+                        // 2. Qualche avversario può vincere al prossimo turno? Bloccalo!
+                        if(bestCol === -1) {
+                            const opponents = pIds.filter(id => id !== currentUid);
+                            for(let opp of opponents) {
+                                for(let c of validCols) {
+                                    let r = getAvailableRow(c);
+                                    if(checkWinAI(board, r, c, opp)) { bestCol = c; break; }
+                                }
+                                if(bestCol !== -1) break;
+                            }
+                        }
+
+                        // 3. Mossa generica: preferisce il centro o casuale
+                        if(bestCol === -1) {
+                            validCols = ui.shuffle(validCols);
+                            const center = Math.floor(cols / 2);
+                            validCols.sort((a, b) => Math.abs(a - center) - Math.abs(b - center));
+                            // Un po' di randomizzazione tra le 3 colonne più centrali per non farlo giocare sempre uguale
+                            let topChoices = validCols.slice(0, 3);
+                            bestCol = topChoices[Math.floor(Math.random() * topChoices.length)];
+                        }
+
+                        actions.connect4_drop(bestCol, currentUid);
+                    }
                 }
             },
 
@@ -2427,14 +2605,16 @@
                         ? `<span class="text-sm font-bold text-yellow-400 mt-1">${val} ${statIcon}</span>`
                         : `<div class="flex gap-1 text-sm md:text-base mt-1">${String(statIcon).repeat(Math.max(0, val))}</div>`;
 
+                    let coinsHTML = '';
                     if (localState.settings.mode === 'betting') {
-                        statHTML = `<span class="text-sm font-bold text-yellow-400 mt-1">🪙 ${p.coins}</span>`;
+                        coinsHTML = `<span class="text-[10px] md:text-xs font-bold text-yellow-400 bg-black/40 px-2 py-0.5 rounded-full mt-1 border border-yellow-500/30">🪙 ${p.coins}</span>`;
                     }
 
                     return `
                         <div class="flex flex-col items-center bg-slate-900 px-4 py-3 rounded-lg border ${uid === highlightUid ? 'border-green-500 shadow-[0_0_10px_#10b981] scale-105 transition-transform' : 'border-slate-700'} relative">
                             <img src="${imgUrl}" class="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover mb-1 border-2 ${uid === highlightUid ? 'border-green-500' : 'border-slate-600'}">
                             <span class="text-xs font-bold text-white">${p.name}</span>
+                            ${coinsHTML}
                             ${statHTML}
                         </div>
                     `;
@@ -2615,13 +2795,22 @@
                 const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
                 let state = localState.gameState.minigameState;
                 
-                // Safety check contro il TypeError quando i dati non sono ancora sincronizzati
                 if(!state || state.phase !== 'playing' || !state.players || !state.players[uid]) return;
                 
                 let newPlayers = JSON.parse(JSON.stringify(state.players));
-                newPlayers[uid].clicks += (typeof amt === 'number' ? amt : 1);
                 
-                await this.updateState({ ...state, players: newPlayers });
+                if (state.light === 'RED') {
+                    // Fallimento per click sul rosso
+                    if (newPlayers[uid].progress > 0) {
+                        newPlayers[uid].progress = 0;
+                        if (uid === user.uid) audioEngine.playWrong();
+                        await this.updateState({ ...state, players: newPlayers });
+                    }
+                } else {
+                    // Aggiunge progresso (+2% per click base)
+                    newPlayers[uid].progress = Math.min(100, newPlayers[uid].progress + (2 * amt));
+                    await this.updateState({ ...state, players: newPlayers });
+                }
             },
 
             // --- VOTING ---
@@ -2645,6 +2834,84 @@
                 }
                 
                 await this.updateState(updateData);
+            },
+
+            // --- FORZA 4 (CONNECT 4) ---
+            async connect4_drop(col, overrideUid = null) {
+                const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
+                let state = localState.gameState.minigameState;
+                const pIds = localState.gameState.selectedPlayers;
+
+                if (localState.gameState.phase !== 'playing' || state.phase !== 'playing') return;
+                if (pIds[state.turnIndex] !== uid) return;
+
+                let newBoard = [...state.board];
+                let dropRow = -1;
+                
+                // Trova la prima cella vuota partendo dal basso
+                for(let r = state.rows - 1; r >= 0; r--) {
+                    if(newBoard[r * state.cols + col] === null) {
+                        dropRow = r;
+                        break;
+                    }
+                }
+
+                if(dropRow === -1) return; // Colonna piena!
+
+                newBoard[dropRow * state.cols + col] = uid;
+                audioEngine.playTick(); // Suono del gettone
+
+                // Funzione per controllare la vittoria
+                const checkWin = (r, c, p) => {
+                    const dirs = [[0,1], [1,0], [1,1], [1,-1]];
+                    for(let [dr, dc] of dirs) {
+                        let count = 1;
+                        for(let i=1; i<4; i++) {
+                            let nr = r + dr*i, nc = c + dc*i;
+                            if(nr>=0 && nr<state.rows && nc>=0 && nc<state.cols && newBoard[nr*state.cols+nc] === p) count++; else break;
+                        }
+                        for(let i=1; i<4; i++) {
+                            let nr = r - dr*i, nc = c - dc*i;
+                            if(nr>=0 && nr<state.rows && nc>=0 && nc<state.cols && newBoard[nr*state.cols+nc] === p) count++; else break;
+                        }
+                        if(count >= 4) return true;
+                    }
+                    return false;
+                };
+
+                const isWin = checkWin(dropRow, col, uid);
+                const isDraw = !newBoard.includes(null);
+
+                if (isWin || isDraw) {
+                    audioEngine.playWin();
+                    let losers = [];
+                    
+                    if (isWin) {
+                        // Chi vince condanna gli altri
+                        losers = pIds.filter(id => id !== uid);
+                    } else {
+                        // Pareggio: ne eliminiamo uno a caso
+                        losers = [pIds[Math.floor(Math.random() * pIds.length)]];
+                    }
+
+                    let newPlayers = JSON.parse(JSON.stringify(state.players));
+                    for(let loserId of losers) {
+                        newPlayers[loserId].lives--;
+                        await this.recordStatLoss(loserId);
+                    }
+
+                    await this.updateState({ ...state, board: newBoard, phase: 'ended', winner: isWin ? uid : null });
+                    
+                    if (isHost) {
+                        setTimeout(() => {
+                            hostEngine.resolveGame(losers);
+                        }, 2500); // Mostra il risultato per qualche secondo prima di chiudere
+                    }
+                } else {
+                    // Passa il turno
+                    let nextTurn = (state.turnIndex + 1) % pIds.length;
+                    await this.updateState({ ...state, board: newBoard, turnIndex: nextTurn });
+                }
             },
 
             // --- BOMB ---
@@ -3178,7 +3445,7 @@
                 // Logica generale: se tocca a un NPC, o se tutti gli NPC possono agire, chiama npcTurn
                 const pIds = gm.selectedPlayers;
                 
-                // Giochi a turni (Tiles, Sequence)
+                // Giochi a turni (Tiles, Sequence, Connect4)
                 if(gm.minigameState.turnIndex !== undefined && gm.currentMinigame !== 'bomb' && gm.currentMinigame !== 'treasure') {
                     let turnIdx = gm.minigameState.turnIndex;
                     let activeUid = pIds[turnIdx];
@@ -3189,8 +3456,9 @@
                         let revealedCount = gm.minigameState.tiles ? gm.minigameState.tiles.filter(t=>t.revealed).length : 0;
                         let seqHash = gm.minigameState.sequence ? gm.minigameState.sequence.join('') : '';
                         let errCount = gm.minigameState.errorCount || 0; // Prende il counter degli errori
+                        let tokensCount = gm.minigameState.board ? gm.minigameState.board.filter(x=>x!==null).length : 0; // Per Forza 4
                         
-                        let stateHash = `${gm.currentMinigame}_${gm.round}_turn${turnIdx}_prog${gm.minigameState.progress || 0}_err${gm.minigameState.errorIndex !== null ? gm.minigameState.errorIndex : 'none'}_rev${revealedCount}_seq${seqHash}_errCount${errCount}`;
+                        let stateHash = `${gm.currentMinigame}_${gm.round}_turn${turnIdx}_prog${gm.minigameState.progress || 0}_err${gm.minigameState.errorIndex !== null ? gm.minigameState.errorIndex : 'none'}_rev${revealedCount}_seq${seqHash}_errCount${errCount}_tok${tokensCount}`;
                         
                         if (window.npcActionHashes['turn'] !== stateHash) {
                             window.npcActionHashes['turn'] = stateHash;
@@ -3246,25 +3514,23 @@
                                 }
                             }
                         } else if(gm.currentMinigame === 'treasure') {
-                            let actionHash = `${gm.currentMinigame}_${gm.round}_loop`;
-                            if (window.npcActionHashes['treasure_' + npc.uid] !== actionHash) {
-                                window.npcActionHashes['treasure_' + npc.uid] = actionHash;
-                                
-                                // FIX: Loop continuo indipendente per il bot in Caccia al Tesoro
-                                const treasureLoop = () => {
-                                    if (localState && localState.gameState && localState.gameState.currentMinigame === 'treasure' && 
-                                        localState.gameState.phase === 'playing' && 
-                                        localState.gameState.round === gm.round) {
-                                        
-                                        minigame.npcTurn(localState.gameState.minigameState, pIds, npc.uid);
-                                        
-                                        // Controlla ciclicamente se si è sbloccato (con fattore di ritardo umano)
-                                        setTimeout(treasureLoop, 600 + Math.random() * 400);
-                                    }
-                                };
-                                
-                                // Inizia con un piccolo ritardo sfalsato
-                                setTimeout(treasureLoop, 500 + (botIndex * 400) + Math.random() * 600);
+                            let botData = gm.minigameState.players ? gm.minigameState.players[npc.uid] : {};
+                            
+                            // Il bot fa una mossa solo se non è in cooldown (e se il gioco non è già finito)
+                            if(botData && Date.now() >= (botData.clickUnlockTime || 0) && !botData.finished) {
+                                // Questo HASH è la soluzione al bug: tiene traccia di QUANTI tentativi ha fatto il bot!
+                                let actionHash = `${gm.currentMinigame}_${gm.round}_atts${botData.attempts || 0}`;
+                                if (window.npcActionHashes[npc.uid] !== actionHash) {
+                                    window.npcActionHashes[npc.uid] = actionHash;
+                                    
+                                    // Leggero ritardo per renderli imperfetti
+                                    const delay = 300 + (botIndex * 400) + Math.random() * 600;
+                                    setTimeout(() => {
+                                        if (localState.gameState.phase === 'playing') {
+                                            minigame.npcTurn(localState.gameState.minigameState, pIds, npc.uid);
+                                        }
+                                    }, delay);
+                                }
                             }
                         } else {
                             // HASH UNIVERSALE per le azioni simultanee dei BOT: rileva esattamente i reset
@@ -3297,42 +3563,84 @@
                                 return; 
                             }
                             
-                            if(Date.now() >= localState.gameState.minigameState.endTime && localState.gameState.minigameState.phase === 'playing') {
+                            let s = localState.gameState.minigameState;
+                            if(!s || s.phase !== 'playing') return;
+
+                            let now = Date.now();
+                            let stateUpdated = false;
+                            let newS = JSON.parse(JSON.stringify(s));
+
+                            // 1. Controlla Vincitori
+                            let somebodyWon = null;
+                            for(const [uid, data] of Object.entries(newS.players)) {
+                                if (data.progress >= 100) somebodyWon = uid;
+                            }
+
+                            // 2. Chiusura del gioco se c'è vincitore o timeout
+                            if (somebodyWon || now >= newS.endTime) {
                                 clearInterval(window.mashHostChecker); window.mashHostChecker=null;
+                                newS.phase = 'ended';
                                 
-                                // Impedisci esecuzioni multiple
-                                localState.gameState.minigameState.phase = 'ended';
-                                
-                                // Calcola chi ha perso
-                                let s = localState.gameState.minigameState;
                                 let lowest = 999999;
                                 let losers = [];
-                                for(const [uid, data] of Object.entries(s.players)) {
-                                    if(data.clicks < lowest) { lowest = data.clicks; losers = [uid]; }
-                                    else if(data.clicks === lowest) losers.push(uid);
+                                for(const [uid, data] of Object.entries(newS.players)) {
+                                    if(data.progress < lowest) { lowest = data.progress; losers = [uid]; }
+                                    else if(data.progress === lowest) losers.push(uid);
                                 }
                                 
-                                // Random tie breaker se tutti hanno stesso punteggio basso
+                                // Random tie breaker
                                 if(losers.length > 1) losers = [losers[Math.floor(Math.random()*losers.length)]];
                                 
-                                let newPlayers = JSON.parse(JSON.stringify(s.players));
                                 let isGameOver = false;
                                 let elim = [];
                                 
-                                // Esegue le perdite in modo sequenziale per non infastidire il database
                                 for (let id of losers) {
-                                    newPlayers[id].lives--;
+                                    newS.players[id].lives--;
                                     await actions.recordStatLoss(id);
-                                    if(newPlayers[id].lives <= 0) { isGameOver = true; elim.push(id); }
+                                    if(newS.players[id].lives <= 0) { isGameOver = true; elim.push(id); }
                                 }
 
+                                await actions.updateState(newS); // Mostra risultati
+
                                 if(isGameOver) {
-                                    await hostEngine.resolveGame(elim);
+                                    let elimToPass = elim.length > 0 ? elim : losers;
+                                    if (localState.settings.mode === 'betting') {
+                                        await hostEngine.resolveGame(losers); // Betting lo calcola in automatico
+                                    } else {
+                                        await hostEngine.resolveGame(elimToPass);
+                                    }
                                 } else {
-                                    // Reset round mash
-                                    for(let k in newPlayers) newPlayers[k].clicks = 0;
-                                    await actions.updateState({...s, players: newPlayers, phase: 'playing', endTime: Date.now() + 10000});
+                                    // Reset nuovo round in Mash
+                                    for(let k in newS.players) newS.players[k].progress = 0;
+                                    await actions.updateState({...newS, phase: 'playing', endTime: Date.now() + 20000, light: 'GREEN', nextLightChange: Date.now() + 2000 + Math.random() * 3000});
                                 }
+                                return;
+                            }
+
+                            // 3. Gestione Semaforo (Luce Rossa/Verde)
+                            if (now >= newS.nextLightChange) {
+                                if (newS.light === 'GREEN') {
+                                    newS.light = 'RED';
+                                    newS.nextLightChange = now + 1500 + Math.random() * 1500; // Rosso per poco tempo (1.5s - 3s)
+                                } else {
+                                    newS.light = 'GREEN';
+                                    newS.nextLightChange = now + 3000 + Math.random() * 4000; // Verde per molto tempo (3s - 7s)
+                                }
+                                stateUpdated = true;
+                            }
+
+                            // 4. Gravità (Decadimento barra)
+                            if (newS.light === 'GREEN') {
+                                for(const [uid, data] of Object.entries(newS.players)) {
+                                    if (data.progress > 0) {
+                                        data.progress = Math.max(0, data.progress - 3); // Perde il 3% ogni mezzo secondo
+                                        stateUpdated = true;
+                                    }
+                                }
+                            }
+
+                            if (stateUpdated) {
+                                await actions.updateState(newS);
                             }
                         }, 500);
                     }
