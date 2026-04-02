@@ -96,6 +96,17 @@
             
             <div class="space-y-4 mb-6">
                 <div>
+                    <label class="block text-sm text-slate-300 mb-1">Modalità di Gioco</label>
+                    <select id="input-game-mode" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white font-bold text-blue-400" onchange="document.getElementById('settings-max-rounds-container').classList.toggle('hidden', this.value !== 'betting')">
+                        <option value="classic">Sopravvivenza (Eliminazione Diretta)</option>
+                        <option value="betting">Scommesse Clandestine (100 Monete Iniziali)</option>
+                    </select>
+                </div>
+                <div id="settings-max-rounds-container" class="hidden">
+                    <label class="block text-sm text-slate-300 mb-1">Round Massimi (Scommesse)</label>
+                    <input type="number" id="input-max-rounds" min="5" max="50" value="15" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+                </div>
+                <div>
                     <label class="block text-sm text-slate-300 mb-1">Giocatori Totali (10-30)</label>
                     <input type="number" id="input-total-players" min="10" max="30" value="15" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white" onchange="logic.updateNPCCount()">
                 </div>
@@ -175,7 +186,7 @@
         <!-- Header Partita -->
         <div class="bg-slate-900/60 backdrop-blur border-b border-white/10 p-3 flex justify-between items-center z-40">
             <div>
-                <h2 class="text-lg font-bold text-blue-400">Round <span id="game-round-number">1</span></h2>
+                <h2 class="text-lg font-bold text-blue-400">Round <span id="game-round-number">1</span><span id="game-max-rounds" class="text-xs text-slate-400 ml-1"></span></h2>
                 <p class="text-xs text-slate-300">Vivi: <span id="game-alive-count">0</span> | Sfida a: <span id="game-challenge-type">3</span></p>
             </div>
             <div class="flex items-center">
@@ -225,7 +236,7 @@
                 </div>
             </div>
 
-            <!-- Centro: Area di Gioco / Suspense -->
+            <!-- Centro: Area di Gioco / Suspense / Betting -->
             <div class="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
                 
                 <!-- Schermata Suspense Selezione -->
@@ -234,6 +245,11 @@
                     <div id="suspense-slots" class="flex gap-4 md:gap-8 flex-wrap justify-center">
                         <!-- Slots generati via JS -->
                     </div>
+                </div>
+
+                <!-- Schermata Scommesse -->
+                <div id="betting-container" class="hidden absolute inset-0 bg-slate-900/95 z-20 flex flex-col items-center justify-center p-4 text-center overflow-y-auto backdrop-blur-md">
+                    <!-- Contenuto dinamico Scommesse -->
                 </div>
 
                 <!-- Area Minigioco -->
@@ -256,10 +272,8 @@
                 </div>
 
                 <!-- Risultato Round -->
-                <div id="round-result-container" class="hidden absolute inset-0 bg-red-900/90 z-30 flex flex-col items-center justify-center text-center p-4 backdrop-blur-sm">
-                    <h2 class="text-5xl font-black text-white mb-4 uppercase drop-shadow-lg">ELIMINAZIONE</h2>
-                    <div id="eliminated-players" class="flex flex-wrap justify-center gap-6 mb-8"></div>
-                    <button id="btn-next-round" class="hidden bg-white text-red-900 font-bold py-3 px-8 rounded-full text-xl hover:scale-105 transition-transform">Prossimo Round</button>
+                <div id="round-result-container" class="hidden absolute inset-0 bg-slate-900/95 z-30 flex flex-col items-center justify-center text-center p-4 backdrop-blur-md">
+                    <!-- Dinamico per mostrare i soldi vinti persi -->
                 </div>
 
             </div>
@@ -294,7 +308,7 @@
                                 <th class="p-3">Giocatore</th>
                                 <th class="p-3 text-center">Sfide Giocate</th>
                                 <th class="p-3 text-center">Sfide Vinte</th>
-                                <th class="p-3 text-center rounded-tr-lg">Vite Perse</th>
+                                <th class="p-3 text-center rounded-tr-lg">Vite/Monete Perse</th>
                             </tr>
                         </thead>
                         <tbody id="stats-table-body" class="text-sm">
@@ -403,7 +417,7 @@
             { id: 'c78', name: 'Terra', url: 'https://i.pinimg.com/736x/f4/8c/fe/f48cfe12b3e2418c2c2688eab0e66f3d.jpg' }
         ];
 
-        const MINIGAMES = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence', 'ricordello', 'treasure'];
+        const MINIGAMES = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence', 'ricordello', 'treasure', 'shell'];
 
         // ==========================================
         // AUDIO ENGINE (Sintetizzatore nativo)
@@ -559,6 +573,9 @@
             async createRoom() {
                 audioEngine.init(); // Sblocca audio
                 const nickname = document.getElementById('input-nickname').value.trim() || 'Host';
+                const gameMode = document.getElementById('input-game-mode').value; // Leggi Modalità Gioco
+                const maxRounds = parseInt(document.getElementById('input-max-rounds').value) || 15; // Leggi Max Round
+                
                 if(!user) await logic.initAuth();
                 
                 currentRoomId = ui.generateId();
@@ -571,7 +588,7 @@
                     id: currentRoomId,
                     status: 'character_select',
                     hostId: user.uid,
-                    settings: { totalPlayers, humanLimit },
+                    settings: { totalPlayers, humanLimit, mode: gameMode, maxRounds: (gameMode === 'betting' ? maxRounds : null) },
                     players: [{
                         uid: user.uid,
                         name: nickname,
@@ -579,11 +596,12 @@
                         charId: null,
                         isReady: false,
                         isAlive: true,
+                        coins: 100, // SCOMMESSE
                         stats: { minigames: 0, wins: 0, livesLost: 0, order: 0 }
                     }],
                     gameState: {
                         round: 0,
-                        phase: 'waiting', // waiting, selecting, playing, resolving
+                        phase: 'waiting', // waiting, selecting, betting, playing, resolving
                         selectedPlayers: [],
                         currentMinigame: null,
                         minigameState: {},
@@ -631,6 +649,7 @@
                             charId: null,
                             isReady: false,
                             isAlive: true,
+                            coins: 100, // SCOMMESSE
                             stats: { minigames: 0, wins: 0, livesLost: 0, order: 0 }
                         }];
                         await updateDoc(roomDoc, { players: updatedPlayers });
@@ -659,7 +678,7 @@
                     id: currentRoomId,
                     status: 'character_select', // Ti porta in Lobby invece che in partita!
                     hostId: user.uid,
-                    settings: { totalPlayers: 3, humanLimit: 3, isTestMode: gameName }, // Crea stanza da max 3 persone
+                    settings: { totalPlayers: 3, humanLimit: 3, isTestMode: gameName, mode: 'classic' }, // Crea stanza da max 3 persone
                     players: [{
                         uid: user.uid,
                         name: nickname,
@@ -667,6 +686,7 @@
                         charId: null,
                         isReady: false,
                         isAlive: true,
+                        coins: 100,
                         stats: { minigames: 0, wins: 0, livesLost: 0, order: 0 }
                     }],
                     gameState: {
@@ -852,6 +872,7 @@
                         charId: char.id,
                         isReady: true,
                         isAlive: true,
+                        coins: 100, // SCOMMESSE
                         stats: { minigames: 0, wins: 0, livesLost: 0, order: 0 }
                     });
                 }
@@ -872,27 +893,39 @@
             renderGame() {
                 const gs = localState.gameState;
                 document.getElementById('game-round-number').innerText = gs.round;
+                
+                // Add max rounds display if betting
+                const maxRoundsEl = document.getElementById('game-max-rounds');
+                if(localState.settings.mode === 'betting' && localState.settings.maxRounds) {
+                    maxRoundsEl.innerText = `/ ${localState.settings.maxRounds}`;
+                } else {
+                    maxRoundsEl.innerText = '';
+                }
+
                 const alive = localState.players.filter(p => p.isAlive);
                 document.getElementById('game-alive-count').innerText = alive.length;
                 document.getElementById('game-challenge-type').innerText = alive.length >= 12 ? '3' : '2';
 
-                // Sidebar
+                // Sidebar (Mostra Monete se in modalità Scommesse)
                 document.getElementById('game-alive-list').innerHTML = alive.map(p => `
                     <div class="flex items-center gap-2 p-1 ${gs.selectedPlayers.includes(p.uid) ? 'bg-blue-900/50 border border-blue-500 rounded' : ''}">
                         <img src="${ui.getChar(p.charId).url}" class="w-8 h-8 rounded object-cover border border-slate-700">
                         <span class="text-sm truncate ${p.uid === user.uid ? 'text-yellow-400 font-bold' : ''}">${p.name}</span>
+                        ${localState.settings.mode === 'betting' ? `<span class="text-xs font-bold text-yellow-400 ml-auto bg-black/30 px-1 rounded">🪙 ${p.coins}</span>` : ''}
                     </div>
                 `).join('');
 
-                // Sidebar Destra: Top 3 Vincitori
-                const topWinners = [...localState.players]
-                    .filter(p => p.stats.wins > 0)
-                    .sort((a, b) => b.stats.wins - a.stats.wins)
-                    .slice(0, 3);
+                // Sidebar Destra: Top 3 Vincitori o Top 3 Più Ricchi
+                let topWinners;
+                if (localState.settings.mode === 'betting') {
+                    topWinners = [...localState.players].filter(p => p.isAlive).sort((a,b) => b.coins - a.coins).slice(0,3);
+                } else {
+                    topWinners = [...localState.players].filter(p => p.stats.wins > 0).sort((a,b) => b.stats.wins - a.stats.wins).slice(0,3);
+                }
                 
                 const topWinnersListEl = document.getElementById('game-top-winners-list');
                 if (topWinnersListEl) {
-                    if (topWinners.length > 0) {
+                    if (topWinners.length > 0 && (localState.settings.mode === 'betting' || topWinners[0].stats.wins > 0)) {
                         topWinnersListEl.innerHTML = topWinners.map((p, i) => `
                             <div class="flex items-center justify-between p-1.5 bg-slate-800/60 rounded border ${i === 0 ? 'border-yellow-500/50 shadow-[0_0_8px_rgba(234,179,8,0.3)]' : 'border-white/5'}">
                                 <div class="flex items-center gap-2">
@@ -900,11 +933,11 @@
                                     <img src="${ui.getChar(p.charId).url}" class="w-6 h-6 rounded object-cover ${p.isAlive ? '' : 'grayscale'}">
                                     <span class="text-xs truncate max-w-[60px] md:max-w-[80px] ${p.isAlive ? 'text-white' : 'text-slate-500 line-through'}">${p.name}</span>
                                 </div>
-                                <span class="text-xs font-bold text-green-400 pr-1">${p.stats.wins}W</span>
+                                <span class="text-xs font-bold text-green-400 pr-1">${localState.settings.mode === 'betting' ? p.coins + '🪙' : p.stats.wins + 'W'}</span>
                             </div>
                         `).join('');
                     } else {
-                        topWinnersListEl.innerHTML = `<div class="text-[10px] text-slate-500 pl-2 italic">Nessuna vittoria...</div>`;
+                        topWinnersListEl.innerHTML = `<div class="text-[10px] text-slate-500 pl-2 italic">Nessun dato...</div>`;
                     }
                 }
 
@@ -958,48 +991,173 @@
                 const susp = document.getElementById('suspense-container');
                 const mini = document.getElementById('minigame-container');
                 const res = document.getElementById('round-result-container');
+                const betCont = document.getElementById('betting-container'); // Nuova Fase Scommesse
                 
                 if(gs.phase === 'init_round') {
                     window.currentSuspenseIds = null;
                     phaseInd.innerText = "Preparazione...";
-                    susp.classList.add('hidden'); mini.classList.add('hidden'); res.classList.add('hidden');
+                    susp.classList.add('hidden'); mini.classList.add('hidden'); res.classList.add('hidden'); betCont.classList.add('hidden');
                 } 
                 else if(gs.phase === 'selecting') {
                     phaseInd.innerText = "Selezione in corso...";
-                    susp.classList.remove('hidden'); mini.classList.add('hidden'); res.classList.add('hidden');
+                    susp.classList.remove('hidden'); mini.classList.add('hidden'); res.classList.add('hidden'); betCont.classList.add('hidden');
                     this.renderSuspense(gs.selectedPlayers);
+                }
+                else if(gs.phase === 'betting') {
+                    window.currentSuspenseIds = null;
+                    phaseInd.innerText = "Scommesse...";
+                    susp.classList.add('hidden'); mini.classList.add('hidden'); res.classList.add('hidden'); 
+                    betCont.classList.remove('hidden');
+                    this.renderBettingPhase();
                 }
                 else if(gs.phase === 'playing') {
                     window.currentSuspenseIds = null;
                     phaseInd.innerText = `Sfida: ${gs.currentMinigame.toUpperCase()}`;
-                    susp.classList.add('hidden'); mini.classList.remove('hidden'); res.classList.add('hidden');
+                    susp.classList.add('hidden'); mini.classList.remove('hidden'); res.classList.add('hidden'); betCont.classList.add('hidden');
                     minigamesEngine.render(gs.currentMinigame, gs.minigameState, gs.selectedPlayers);
                 }
                 else if(gs.phase === 'resolving') {
                     window.currentSuspenseIds = null;
-                    phaseInd.innerText = "Eliminazione";
-                    susp.classList.add('hidden'); mini.classList.add('hidden'); res.classList.remove('hidden');
+                    phaseInd.innerText = "Risultati";
+                    susp.classList.add('hidden'); mini.classList.add('hidden'); res.classList.remove('hidden'); betCont.classList.add('hidden');
                     
-                    const elList = document.getElementById('eliminated-players');
-                    elList.innerHTML = gs.eliminatedThisRound.map(uid => {
-                        const p = localState.players.find(x => x.uid === uid);
-                        return `
-                            <div class="flex flex-col items-center p-4 bg-red-950/80 rounded-xl border border-red-500 shadow-xl scale-110">
-                                <img src="${ui.getChar(p.charId).url}" class="w-24 h-24 rounded object-cover mb-2 grayscale">
-                                <span class="font-bold text-xl">${p.name}</span>
-                                <span class="text-sm text-red-300">ELIMINATO</span>
-                            </div>
-                        `;
-                    }).join('');
+                    let html = `<div class="flex flex-col items-center justify-center w-full max-w-4xl max-h-screen overflow-y-auto p-4">`;
                     
-                    const btn = document.getElementById('btn-next-round');
-                    if(isHost) {
-                        btn.classList.remove('hidden');
-                        btn.onclick = () => hostEngine.startRound();
-                        if(alive.length <= 1) btn.innerText = "Vedi Classifica Finale";
+                    if (localState.settings.mode === 'betting') {
+                        html += `<h2 class="text-4xl md:text-5xl font-black text-yellow-400 mb-6 drop-shadow-md text-center">RISULTATI ROUND ${gs.round}</h2>`;
+                        
+                        // 1. Minigame Losers
+                        html += `<div class="w-full bg-slate-800/90 p-4 rounded-xl border border-slate-600 mb-4 shadow-lg">
+                                    <h3 class="text-xl font-bold text-slate-300 mb-3 text-center uppercase tracking-wider">Sconfitti nell'Arena</h3>
+                                    <div class="flex flex-wrap justify-center gap-4">`;
+                        if (gs.losersThisRound && gs.losersThisRound.length > 0) {
+                            gs.losersThisRound.forEach(uid => {
+                                const p = localState.players.find(x => x.uid === uid);
+                                html += `<div class="flex flex-col items-center"><img src="${ui.getChar(p.charId).url}" class="w-14 h-14 rounded-full border-2 border-red-500 object-cover shadow-md"><span class="text-sm mt-1 text-red-400 font-bold">${p.name}</span></div>`;
+                            });
+                        } else {
+                            html += `<span class="text-green-400 font-bold text-lg">Tutti gli sfidanti si sono salvati!</span>`;
+                        }
+                        html += `</div></div>`;
+
+                        // 2. Bet Winners
+                        html += `<div class="w-full bg-slate-800/90 p-4 rounded-xl border border-yellow-600 mb-4 shadow-[0_0_15px_rgba(202,138,4,0.2)]">
+                                    <h3 class="text-xl font-bold text-yellow-400 mb-3 text-center uppercase tracking-wider">Scommesse Vinte</h3>
+                                    <div class="flex flex-wrap justify-center gap-3">`;
+                        if (gs.betWinners && gs.betWinners.length > 0) {
+                            gs.betWinners.forEach(bw => {
+                                const p = localState.players.find(x => x.uid === bw.uid);
+                                html += `<div class="bg-green-900/60 border border-green-500 text-green-300 px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 shadow-md"><img src="${ui.getChar(p.charId).url}" class="w-6 h-6 rounded-full object-cover">${p.name}: <span class="text-yellow-400">+${bw.won}🪙</span></div>`;
+                            });
+                        } else {
+                            html += `<span class="text-slate-400 italic">Nessuno ha vinto scommesse questo round.</span>`;
+                        }
+                        html += `</div></div>`;
+
+                        // 3. Bankruptcies
+                        if (gs.eliminatedThisRound && gs.eliminatedThisRound.length > 0) {
+                            html += `<div class="w-full bg-red-950/90 p-4 rounded-xl border-2 border-red-600 shadow-[0_0_20px_#ef4444]">
+                                        <h3 class="text-2xl font-black text-white mb-4 text-center uppercase tracking-widest drop-shadow">Bancarotta</h3>
+                                        <div class="flex flex-wrap justify-center gap-6">`;
+                            gs.eliminatedThisRound.forEach(uid => {
+                                const p = localState.players.find(x => x.uid === uid);
+                                html += `<div class="flex flex-col items-center"><img src="${ui.getChar(p.charId).url}" class="w-20 h-20 rounded-lg grayscale border-4 border-red-600 object-cover"><span class="text-base mt-2 text-red-300 font-bold line-through uppercase">${p.name}</span></div>`;
+                            });
+                            html += `</div></div>`;
+                        }
+
                     } else {
-                        btn.classList.add('hidden');
+                        // Classic mode UI
+                        html += `<h2 class="text-5xl md:text-6xl font-black text-white mb-8 text-center uppercase drop-shadow-lg">${gs.eliminatedThisRound.length === 0 ? 'SOPRAVVISSUTI' : 'ELIMINAZIONE'}</h2>`;
+                        html += `<div class="flex flex-wrap justify-center gap-6 mb-8 w-full">`;
+                        if (gs.eliminatedThisRound.length === 0) {
+                            html += `<div class="text-2xl md:text-3xl text-green-400 font-bold bg-black/50 px-8 py-6 rounded-2xl border-2 border-green-500 shadow-[0_0_20px_#22c55e]">Nessuno è stato eliminato!</div>`;
+                        } else {
+                            gs.eliminatedThisRound.forEach(uid => {
+                                const p = localState.players.find(x => x.uid === uid);
+                                html += `
+                                    <div class="flex flex-col items-center p-6 bg-red-950/90 rounded-2xl border-2 border-red-500 shadow-[0_0_20px_#ef4444] scale-110">
+                                        <img src="${ui.getChar(p.charId).url}" class="w-32 h-32 rounded-xl object-cover mb-4 grayscale">
+                                        <span class="font-black text-2xl mb-1">${p.name}</span>
+                                        <span class="text-sm font-bold text-red-300 tracking-widest">ELIMINATO</span>
+                                    </div>
+                                `;
+                            });
+                        }
+                        html += `</div>`;
                     }
+                    
+                    if(isHost) {
+                        const isGameOver = gs.isGameOver || alive.length <= 1;
+                        html += `<button onclick="if(${isGameOver}) { actions.finish_game(); } else { actions.next_round(); }" class="mt-8 bg-white text-slate-900 font-black py-4 px-10 rounded-full text-xl md:text-2xl hover:scale-105 transition-transform shadow-[0_5px_15px_rgba(255,255,255,0.3)] z-50">
+                            ${isGameOver ? 'VEDI CLASSIFICA FINALE' : 'PROSSIMO ROUND'}
+                        </button>`;
+                    }
+                    
+                    html += `</div>`;
+                    res.innerHTML = html;
+                }
+            },
+
+            renderBettingPhase() {
+                const gs = localState.gameState;
+                const container = document.getElementById('betting-container');
+                const isParticipant = gs.selectedPlayers.includes(user.uid);
+                let timeLeft = Math.max(0, Math.ceil((gs.betEndTime - Date.now())/1000));
+                
+                let html = `<div class="bg-slate-800/90 border border-yellow-500 p-8 rounded-2xl shadow-[0_0_30px_rgba(234,179,8,0.3)] flex flex-col items-center w-full max-w-2xl">
+                                <h2 class="text-3xl md:text-5xl font-black text-yellow-400 mb-2 drop-shadow-md">IL BANCO È APERTO</h2>
+                                <div class="text-3xl md:text-4xl font-bold mb-8 text-white bg-slate-900 px-6 py-2 rounded-full border border-slate-700">${timeLeft}s</div>`;
+                            
+                const myPlayer = localState.players.find(p=>p.uid===user.uid);
+                
+                if (!myPlayer || !myPlayer.isAlive) {
+                    html += `<p class="text-xl text-red-500 font-bold">Sei eliminato. Goditi lo spettacolo.</p>`;
+                } 
+                else if(isParticipant) {
+                    html += `<div class="bg-blue-900/50 border border-blue-500 p-4 rounded-xl w-full text-center">
+                                <p class="text-xl text-blue-300 font-bold">Sei nell'Arena! Hai pagato un Buy-in di ${myPlayer.currentBuyIn}🪙.</p>
+                                <p class="text-slate-300 mt-2">Sopravvivi al minigioco per raddoppiare in ${myPlayer.currentBuyIn * 2}🪙!<br>Se perdi... addio monete.</p>
+                             </div>`;
+                } 
+                else {
+                    const myBet = gs.bets && gs.bets[user.uid];
+                    if(myBet) {
+                        const targetName = localState.players.find(p=>p.uid===myBet.target).name;
+                        html += `<div class="bg-green-900/50 border border-green-500 p-4 rounded-xl w-full text-center">
+                                    <p class="text-xl text-green-400 font-bold">Hai scommesso ${myBet.amount}🪙 contro ${targetName}!</p>
+                                    <p class="text-slate-300 mt-2">Se perde, vinci ${myBet.amount * 2}🪙. Se si salva, perdi i soldi.</p>
+                                 </div>`;
+                    } else {
+                        html += `<h3 class="text-xl mb-4 font-bold text-slate-200">Scommetti su chi <span class="text-red-500">PERDERÀ</span> la sfida!</h3>
+                                 <p class="text-sm text-yellow-400 mb-4">Le tue monete: 🪙 ${myPlayer.coins}</p>
+                                 <div class="flex gap-4 flex-wrap justify-center w-full">`;
+                        gs.selectedPlayers.forEach(uid => {
+                            const p = localState.players.find(x=>x.uid===uid);
+                            html += `<div class="bg-slate-900 p-4 rounded-xl flex flex-col items-center border border-slate-600">
+                                        <img src="${ui.getChar(p.charId).url}" class="w-16 h-16 rounded-full mb-2 object-cover border-2 border-slate-500">
+                                        <span class="font-bold text-sm truncate max-w-[100px]">${p.name}</span>
+                                        <span class="text-xs text-yellow-400 font-bold mb-3">🪙 ${p.coins}</span>
+                                        <div class="flex flex-col gap-2 w-full">
+                                            ${myPlayer.coins >= 10 ? `<button class="bg-red-600 hover:bg-red-500 px-3 py-1 rounded text-sm font-bold w-full transition-colors shadow-md" onclick="actions.place_bet('${uid}', 10)">10🪙</button>` : ''}
+                                            ${myPlayer.coins >= 20 ? `<button class="bg-red-600 hover:bg-red-500 px-3 py-1 rounded text-sm font-bold w-full transition-colors shadow-md" onclick="actions.place_bet('${uid}', 20)">20🪙</button>` : ''}
+                                            ${myPlayer.coins >= 30 ? `<button class="bg-red-600 hover:bg-red-500 px-3 py-1 rounded text-sm font-bold w-full transition-colors shadow-md" onclick="actions.place_bet('${uid}', 30)">30🪙</button>` : ''}
+                                            ${myPlayer.coins < 10 ? `<span class="text-xs text-red-500 font-bold">Non hai abbastanza monete!</span>` : ''}
+                                        </div>
+                                     </div>`;
+                        });
+                        html += `</div>`;
+                    }
+                }
+                
+                html += `</div>`;
+                container.innerHTML = html;
+                
+                if(!window.bettingInterval) {
+                    window.bettingInterval = setInterval(() => {
+                        if(localState.gameState.phase !== 'betting') { clearInterval(window.bettingInterval); window.bettingInterval=null; return; }
+                        logic.renderGame();
+                    }, 1000);
                 }
             },
 
@@ -1020,6 +1178,7 @@
                                 <div id="susp-card-${p.uid}" class="relative flex flex-col items-center bg-slate-800 p-2 rounded-xl shadow-lg border-2 border-transparent w-20 md:w-28 opacity-50 grayscale transition-all duration-100">
                                     <img src="${ui.getChar(p.charId).url}" class="w-14 h-14 md:w-20 md:h-20 rounded-lg object-cover mb-1">
                                     <span class="text-[10px] md:text-xs font-bold text-white w-full text-center overflow-hidden text-ellipsis whitespace-nowrap">${p.name}</span>
+                                    ${localState.settings.mode === 'betting' ? `<span class="text-[10px] md:text-xs font-bold text-yellow-400 mt-1">🪙 ${p.coins}</span>` : ''}
                                 </div>
                             `).join('')}
                         </div>
@@ -1072,13 +1231,17 @@
 
             renderStats() {
                 ui.showScreen('stats');
-                const players = [...localState.players].sort((a, b) => b.stats.order - a.stats.order); // Ordina per eliminazione (più alto = durato di più)
+                const isBetting = localState.settings.mode === 'betting';
+                const players = [...localState.players].sort((a, b) => {
+                    if (isBetting) return b.coins - a.coins;
+                    return b.stats.order - a.stats.order; 
+                }); // Ordina per monete o per eliminazione
                 
                 const winner = players[0];
                 document.getElementById('winner-display').innerHTML = `
                     <img src="${ui.getChar(winner.charId).url}" class="w-48 h-48 rounded-2xl object-cover border-8 border-yellow-400 shadow-[0_0_30px_rgba(250,204,21,0.8)] mb-4">
                     <h2 class="text-4xl font-bold text-white">${winner.name}</h2>
-                    <p class="text-yellow-400">Ultimo sopravvissuto</p>
+                    <p class="text-yellow-400">${isBetting ? `Il più ricco: 🪙 ${winner.coins}` : 'Ultimo sopravvissuto'}</p>
                 `;
 
                 const tbody = document.getElementById('stats-table-body');
@@ -1091,7 +1254,7 @@
                         </td>
                         <td class="p-3 text-center">${p.stats.minigames}</td>
                         <td class="p-3 text-center text-green-400 font-bold">${p.stats.wins}</td>
-                        <td class="p-3 text-center text-red-400">${p.stats.livesLost}</td>
+                        <td class="p-3 text-center text-red-400">${isBetting ? `🪙 ${p.coins}` : p.stats.livesLost}</td>
                     </tr>
                 `).join('');
             }
@@ -1121,11 +1284,19 @@
                 
                 // Condizione Finale
                 if(alive.length <= 1) {
-                    await this.finishGame(alive[0]?.uid);
+                    await this.finishGame(alive.length === 1 ? alive[0].uid : null);
                     return;
                 }
 
-                let numToSelect = alive.length >= 12 ? 3 : 2;
+                // In Scommesse, se siamo in tanti aumentiamo gli sfidanti!
+                let numToSelect = 2;
+                if (localState.settings.mode === 'betting') {
+                    if (alive.length >= 20) numToSelect = 5;
+                    else if (alive.length >= 10) numToSelect = 4;
+                    else if (alive.length >= 5) numToSelect = 3;
+                } else {
+                    numToSelect = alive.length >= 12 ? 3 : 2;
+                }
                 
                 // Se siamo nella Modalità Test (vs 2 Bot), fai sempre sfidare tutti e 3 finché non ne muoiono 2
                 if (localState.settings.isTestMode && alive.length === 3) {
@@ -1151,10 +1322,38 @@
                     players: updatedPlayers
                 });
 
-                // Suspense Timeout
+                // Suspense Timeout - Dipende se Scommesse o Classica
                 setTimeout(() => {
-                    this.initMinigame(selected, alive.length === 2);
+                    if (localState.settings.mode === 'betting') {
+                        this.startBettingPhase(selected);
+                    } else {
+                        this.initMinigame(selected, alive.length === 2);
+                    }
                 }, 6500); // Sincronizzato con i 5 secondi di roulette + 1.5s di pausa
+            },
+
+            async startBettingPhase(selectedIds) {
+                let updatedPlayers = [...localState.players];
+                // Deduzione Buy-in per gli sfidanti
+                selectedIds.forEach(uid => {
+                    let p = updatedPlayers.find(x => x.uid === uid);
+                    if(p) {
+                        let buyIn = Math.min(20, p.coins); // Va in All-in se ha meno di 20
+                        p.coins -= buyIn;
+                        p.currentBuyIn = buyIn;
+                    }
+                });
+
+                await updateDoc(logic.getRoomDoc(currentRoomId), {
+                    'gameState.phase': 'betting',
+                    'gameState.bets': {},
+                    'gameState.betEndTime': Date.now() + 10000,
+                    players: updatedPlayers
+                });
+
+                setTimeout(() => {
+                    this.initMinigame(selectedIds);
+                }, 10000); // 10 secondi di scommesse
             },
 
             async initMinigame(selectedIds, isFinal) {
@@ -1166,9 +1365,7 @@
                 } else {
                     // Scegli gioco casuale compatibile col numero di giocatori
                     let availableGames = MINIGAMES;
-                    if(selectedIds.length === 3) {
-                        availableGames = ['tiles', 'dice', 'voting', 'reaction', 'mash', 'bomb', 'sequence', 'ricordello', 'treasure'];
-                    }
+                    // Tiles necessita di un po' di attenzione con i numeri dei bot, ma lasciamo tutti attivi
                     gameName = availableGames[Math.floor(Math.random() * availableGames.length)];
                 }
                 
@@ -1185,46 +1382,104 @@
             async resolveGame(loserIds) {
                 if(localState.gameState.phase === 'resolving') return; // Guardia contro esecuzioni multiple
 
-                // loserIds è un array.
                 let updatedPlayers = [...localState.players];
                 let eliminations = [];
                 let aliveCount = updatedPlayers.filter(p => p.isAlive).length;
+                let betWinners = [];
+                let losersThisRound = [...loserIds];
 
-                loserIds.forEach(uid => {
-                    let p = updatedPlayers.find(x => x.uid === uid);
-                    if (p) {
-                        p.isAlive = false;
-                        p.stats.order = aliveCount; // L'ordine di eliminazione è basato su quanti erano vivi (più alto = migliore)
-                        aliveCount--;
-                        eliminations.push(uid);
+                if (localState.settings.mode === 'betting') {
+                    // ---- LOGICA SCOMMESSE (MONETE) ----
+                    
+                    // 1. Sfida vinta dai sopravvissuti: Raddoppiano il Buy-in
+                    localState.gameState.selectedPlayers.forEach(uid => {
+                        if (!loserIds.includes(uid)) {
+                            let p = updatedPlayers.find(x => x.uid === uid);
+                            if (p) p.coins += (p.currentBuyIn || 20) * 2;
+                            if (p) p.stats.wins++;
+                        }
+                    });
+                    
+                    // 2. Scommesse spettatori: Raddoppiano se beccano il perdente
+                    if (localState.gameState.bets) {
+                        for (const [uid, bet] of Object.entries(localState.gameState.bets)) {
+                            if (loserIds.includes(bet.target)) {
+                                let p = updatedPlayers.find(x => x.uid === uid);
+                                if (p) {
+                                    p.coins += bet.amount * 2; // Raddoppia la puntata!
+                                    betWinners.push({ uid: uid, won: bet.amount * 2 });
+                                }
+                            }
+                        }
                     }
-                });
 
-                // Update win stats per chi era selezionato ma non ha perso
-                localState.gameState.selectedPlayers.forEach(uid => {
-                    if(!loserIds.includes(uid)) {
+                    // 3. Controllo Bancarotta (Eliminazione)
+                    updatedPlayers.forEach(p => {
+                        if (p.isAlive && p.coins <= 0) {
+                            p.isAlive = false;
+                            p.stats.order = aliveCount;
+                            aliveCount--;
+                            eliminations.push(p.uid);
+                        }
+                    });
+
+                } else {
+                    // ---- LOGICA CLASSICA (VITE) ----
+                    loserIds.forEach(uid => {
                         let p = updatedPlayers.find(x => x.uid === uid);
-                        if (p) p.stats.wins++;
-                    }
-                });
+                        if (p) {
+                            p.isAlive = false;
+                            p.stats.order = aliveCount; // L'ordine di eliminazione è basato su quanti erano vivi (più alto = migliore)
+                            aliveCount--;
+                            eliminations.push(uid);
+                        }
+                    });
+
+                    localState.gameState.selectedPlayers.forEach(uid => {
+                        if(!loserIds.includes(uid)) {
+                            let p = updatedPlayers.find(x => x.uid === uid);
+                            if (p) p.stats.wins++;
+                        }
+                    });
+                }
+
+                let gameFinished = false;
+                if (localState.settings.mode === 'betting' && localState.settings.maxRounds && localState.gameState.round >= localState.settings.maxRounds) {
+                    gameFinished = true;
+                }
 
                 await updateDoc(logic.getRoomDoc(currentRoomId), {
                     'gameState.phase': 'resolving',
                     'gameState.eliminatedThisRound': eliminations,
+                    'gameState.losersThisRound': losersThisRound,
+                    'gameState.betWinners': betWinners,
+                    'gameState.isGameOver': gameFinished || aliveCount <= 1,
                     players: updatedPlayers
                 });
             },
 
             async finishGame(winnerId) {
+                let updatedPlayers = [...localState.players];
+                
+                if (!winnerId) {
+                    let alive = updatedPlayers.filter(p => p.isAlive);
+                    if (localState.settings.mode === 'betting') {
+                        alive.sort((a,b) => b.coins - a.coins);
+                    } else {
+                        alive.sort((a,b) => b.stats.order - a.stats.order); 
+                    }
+                    if (alive.length > 0) winnerId = alive[0].uid;
+                }
+
                 if(winnerId) {
-                    let updatedPlayers = [...localState.players];
                     let w = updatedPlayers.find(x => x.uid === winnerId);
                     if(w) w.stats.order = 999; // Vincitore assoluto
-                    await updateDoc(logic.getRoomDoc(currentRoomId), {
-                        status: 'finished',
-                        players: updatedPlayers
-                    });
                 }
+                
+                await updateDoc(logic.getRoomDoc(currentRoomId), {
+                    status: 'finished',
+                    players: updatedPlayers
+                });
             }
         };
 
@@ -1237,8 +1492,8 @@
                     title: "Tiles Fortunata",
                     desc: "Evita le bombe! Fai a turno per cliccare una tile.",
                     init(pIds) {
-                        const size = pIds.length === 3 ? 49 : 36;
-                        const numBombs = pIds.length === 3 ? 8 : 5;
+                        const size = pIds.length >= 4 ? 64 : (pIds.length === 3 ? 49 : 36);
+                        const numBombs = pIds.length >= 4 ? 12 : (pIds.length === 3 ? 8 : 5);
                         let tiles = Array(size).fill({ type: 'safe', revealed: false });
                         for(let i=0; i<numBombs; i++) tiles[i] = { type: 'bomb', revealed: false };
                         tiles = ui.shuffle(tiles);
@@ -1265,7 +1520,7 @@
                         this.renderHUD(state.players, pIds, isMyTurn ? turnUid : null);
 
                         // Grid
-                        const cols = pIds.length === 3 ? 7 : 6;
+                        const cols = pIds.length >= 4 ? 8 : (pIds.length === 3 ? 7 : 6);
                         area.innerHTML = `<div class="game-grid" style="grid-template-columns: repeat(${cols}, 50px);">
                             ${state.tiles.map((t, i) => `
                                 <div class="tile w-[50px] h-[50px] ${t.revealed ? (t.type === 'bomb' ? 'bomb revealed' : 'safe revealed') : ''}" 
@@ -1297,15 +1552,15 @@
                         const area = document.getElementById('minigame-render-area');
                         this.renderHUD(state.players, pIds);
                         
-                        area.innerHTML = `<div class="flex gap-8 justify-center items-end h-40">
+                        area.innerHTML = `<div class="flex gap-4 md:gap-8 justify-center flex-wrap items-end h-auto min-h-40">
                             ${pIds.map(uid => {
                                 const p = localState.players.find(x => x.uid === uid);
                                 const myData = state.players[uid];
-                                return `<div class="flex flex-col items-center gap-2">
-                                    <div class="w-20 h-20 bg-slate-700 rounded-xl flex justify-center items-center text-4xl font-black ${myData.roll ? 'bg-blue-600' : 'animate-pulse'}">
+                                return `<div class="flex flex-col items-center gap-2 mb-4">
+                                    <div class="w-16 h-16 md:w-20 md:h-20 bg-slate-700 rounded-xl flex justify-center items-center text-3xl md:text-4xl font-black ${myData.roll ? 'bg-blue-600' : 'animate-pulse'}">
                                         ${myData.roll || '?'}
                                     </div>
-                                    <img src="${ui.getChar(p.charId).url}" class="w-10 h-10 rounded-full">
+                                    <img src="${ui.getChar(p.charId).url}" class="w-8 h-8 md:w-10 md:h-10 rounded-full">
                                 </div>`;
                             }).join('')}
                         </div>`;
@@ -1422,7 +1677,7 @@
 
                 voting: {
                     title: "Giudizio Universale",
-                    desc: "I giocatori SALVI votano chi eliminare. Se c'è parità, decide la sorte.",
+                    desc: "I giocatori SALVI votano chi punire/eliminare.",
                     init(pIds) {
                         let votes = {};
                         localState.players.filter(p => p.isAlive && !pIds.includes(p.uid)).forEach(p => {
@@ -1435,13 +1690,13 @@
                         const isVoter = state.votes.hasOwnProperty(user.uid);
                         const hasVoted = state.votes[user.uid] !== null;
                         
-                        let html = `<div class="flex gap-8 justify-center mb-8">`;
+                        let html = `<div class="flex gap-4 md:gap-8 flex-wrap justify-center mb-8">`;
                         pIds.forEach(uid => {
                             const p = localState.players.find(x => x.uid === uid);
                             const voteCount = Object.values(state.votes).filter(v => v === uid).length;
                             html += `<div class="flex flex-col items-center bg-slate-700 p-4 rounded-xl">
-                                <img src="${ui.getChar(p.charId).url}" class="w-24 h-24 object-cover rounded mb-2">
-                                <span class="font-bold">${p.name}</span>
+                                <img src="${ui.getChar(p.charId).url}" class="w-16 h-16 md:w-24 md:h-24 object-cover rounded mb-2">
+                                <span class="font-bold text-sm truncate max-w-[100px] text-center">${p.name}</span>
                                 <div class="text-3xl text-red-500 mt-2 font-black">${state.phase==='result' ? voteCount : '?'}</div>
                                 ${isVoter && !hasVoted && state.phase === 'voting' ? `<button onclick="actions.voting_vote('${uid}')" class="mt-4 bg-red-600 px-4 py-2 rounded font-bold hover:bg-red-500">VOTA</button>` : ''}
                             </div>`;
@@ -1743,7 +1998,7 @@
                                 <div class="flex flex-col items-center bg-slate-900 px-4 py-3 rounded-lg border relative ${uid === user.uid ? 'border-green-500 shadow-[0_0_10px_#10b981]' : 'border-slate-700'}">
                                     <img src="${charData.url}" class="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover mb-1 border-2 border-slate-600 ${myData.finished ? 'border-green-500' : ''}">
                                     <span class="text-xs font-bold text-white">${p.name}</span>
-                                    <span class="text-xs font-bold text-yellow-400 mt-1">${statusText}</span>
+                                    <span class="text-xs font-bold text-yellow-400 mt-1">${localState.settings.mode === 'betting' ? `🪙 ${p.coins}<br>` : ''}${statusText}</span>
                                 </div>
                             `;
                         }).join('');
@@ -1900,6 +2155,164 @@
                             actions.treasure_safe_click(choice, currentUid);
                         }
                     }
+                },
+                
+                shell: {
+                    title: "Il Trucco dei Bicchieri",
+                    desc: "Segui il diamante! 💎 Quando i bauli si fermano, clicca su quello giusto.",
+                    init(pIds) {
+                        let players = {};
+                        pIds.forEach(id => players[id] = { lives: 3, guess: null });
+                        let chests = Array(4).fill(null).map((_, i) => ({ id: i, diamond: i === 0 }));
+                        chests = ui.shuffle(chests);
+                        return { players, phase: 'reveal', chests, difficulty: 0, endTime: Date.now() + 3000 };
+                    },
+                    render(state, pIds) {
+                        this.renderHUD(state.players, pIds);
+                        const area = document.getElementById('minigame-render-area');
+                        let isParticipant = pIds.includes(user.uid);
+                        let myData = state.players[user.uid] || { guess: null };
+                        
+                        let html = `<div class="flex flex-col items-center w-full">`;
+                        
+                        html += `<div class="h-14 flex flex-col items-center justify-end mb-6">`;
+                        let timeLeft = Math.max(0, Math.ceil((state.endTime - Date.now())/1000));
+                        
+                        if (state.phase === 'reveal') {
+                            html += `<h3 class="text-xl text-yellow-400 font-bold animate-pulse">Osserva bene! ${timeLeft}s</h3>`;
+                        } else if (state.phase === 'shuffle') {
+                            html += `<h3 class="text-xl text-blue-400 font-bold">Rimescolamento in corso...</h3>`;
+                        } else if (state.phase === 'guess') {
+                            html += `<h3 class="text-xl text-green-400 font-bold animate-pulse">Dov'è il diamante? ${timeLeft}s</h3>`;
+                            if(isParticipant && myData.guess !== null) html += `<p class="text-sm text-slate-300">Risposta registrata!</p>`;
+                        } else if (state.phase === 'result') {
+                            html += `<h3 class="text-xl text-white font-bold">Risultati</h3>`;
+                        }
+                        html += `</div>`;
+
+                        let chestCount = state.chests.length;
+                        html += `<div id="shell-container" class="relative w-full h-24 md:h-32 max-w-4xl px-4 mx-auto mt-4">`;
+
+                        // Se siamo nel mezzo dello shuffle non ricreiamo gli elementi HTML, modifichiamo solo lo stile per permettere la transizione CSS!
+                        if (state.phase === 'shuffle') {
+                            if (!window.localShell) {
+                                // Prima volta che entra in shuffle: crea il DOM iniziale
+                                window.localShell = {
+                                    positions: state.chests.map((c, i) => ({ id: c.id, pos: i })),
+                                    swapIdx: 0,
+                                    isSwapping: false
+                                };
+
+                                let swapSpeed = 400 - (state.difficulty * 50);
+
+                                window.localShell.positions.forEach((p) => {
+                                    let pct = (p.pos / (chestCount - 1)) * 80 + 10; // Da 10% a 90%
+                                    let tileClass = `absolute top-0 w-16 h-16 md:w-24 md:h-24 flex items-center justify-center text-4xl md:text-6xl bg-slate-700 rounded-xl shadow-lg border-b-4 border-slate-900`;
+                                    html += `<div id="chest-anim-${p.id}" class="${tileClass}" style="left: ${pct}%; transform: translateX(-50%); transition: left ${swapSpeed}ms ease-in-out;">📦</div>`;
+                                });
+
+                                area.innerHTML = html + `</div></div>`;
+
+                                // Loop di interpolazione manuale per gli scambi CSS!
+                                if (!window.shellRenderInterval) {
+                                    window.shellRenderInterval = setInterval(() => {
+                                        if (localState.gameState.currentMinigame !== 'shell' || localState.gameState.minigameState.phase !== 'shuffle') {
+                                            clearInterval(window.shellRenderInterval); window.shellRenderInterval=null; return;
+                                        }
+                                        
+                                        let st = localState.gameState.minigameState;
+                                        let ls = window.localShell;
+                                        
+                                        if (ls && !ls.isSwapping && st.swaps && ls.swapIdx < st.swaps.length) {
+                                            ls.isSwapping = true;
+                                            let {a, b} = st.swaps[ls.swapIdx];
+                                            
+                                            // Trova chi occupa visualmente le posizioni A e B e scambiali
+                                            let chestA = ls.positions.find(p => p.pos === a);
+                                            let chestB = ls.positions.find(p => p.pos === b);
+                                            
+                                            if (chestA && chestB) {
+                                                chestA.pos = b;
+                                                chestB.pos = a;
+                                                
+                                                let elA = document.getElementById(`chest-anim-${chestA.id}`);
+                                                let elB = document.getElementById(`chest-anim-${chestB.id}`);
+                                                
+                                                let pctA = (chestA.pos / (chestCount - 1)) * 80 + 10;
+                                                let pctB = (chestB.pos / (chestCount - 1)) * 80 + 10;
+                                                
+                                                if(elA) elA.style.left = `${pctA}%`;
+                                                if(elB) elB.style.left = `${pctB}%`;
+                                                
+                                                audioEngine.playTick();
+                                            }
+                                            
+                                            ls.swapIdx++;
+                                            let currentSwapSpeed = 400 - (st.difficulty * 50);
+                                            
+                                            setTimeout(() => {
+                                                if(window.localShell) window.localShell.isSwapping = false;
+                                            }, currentSwapSpeed); 
+                                        }
+                                    }, 50);
+                                }
+                            }
+                        } else {
+                            // Fasi Normali (Svelamento, Indovinello, Risultato) - Utilizza comunque layout assoluto per non far "saltare" la grafica!
+                            window.localShell = null;
+                            if (window.shellRenderInterval) { clearInterval(window.shellRenderInterval); window.shellRenderInterval = null; }
+
+                            state.chests.forEach((c, i) => {
+                                let content = '📦';
+                                if (state.phase === 'reveal' && c.diamond) content = '💎';
+                                if (state.phase === 'result') content = c.diamond ? '💎' : '❌';
+                                
+                                let pct = (i / (chestCount - 1)) * 80 + 10;
+                                let tileClass = "absolute top-0 w-16 h-16 md:w-24 md:h-24 flex items-center justify-center text-4xl md:text-6xl bg-slate-700 rounded-xl shadow-lg border-b-4 border-slate-900 transition-transform duration-200";
+                                
+                                if (state.phase === 'guess' && isParticipant && myData.guess === null) {
+                                    tileClass += " hover:scale-110 hover:bg-slate-600 cursor-pointer";
+                                }
+                                if (myData.guess === c.id) {
+                                    tileClass += " ring-4 ring-blue-500 scale-105";
+                                }
+                                if (state.phase === 'result') {
+                                    if (c.diamond) tileClass += " bg-green-700";
+                                    else if (myData.guess === c.id) tileClass += " bg-red-700";
+                                }
+
+                                html += `<div class="${tileClass}" style="left: ${pct}%; transform: translateX(-50%);" onpointerdown="if(${state.phase === 'guess'} && ${isParticipant} && ${myData.guess === null}) { event.preventDefault(); actions.shell_click(${c.id}); }">${content}</div>`;
+                            });
+
+                            html += `</div></div>`;
+                            area.innerHTML = html;
+                        }
+                    },
+                    npcTurn(state, pIds, currentUid) {
+                        let myData = state.players[currentUid];
+                        if (state.phase === 'guess' && myData && myData.guess === null) {
+                            let actionHash = `${state.phase}_${state.difficulty}_guess`;
+                            if (window.npcActionHashes['shell_' + currentUid] !== actionHash) {
+                                window.npcActionHashes['shell_' + currentUid] = actionHash;
+                                
+                                setTimeout(() => {
+                                    if (localState.gameState.phase === 'playing' && localState.gameState.minigameState.phase === 'guess') {
+                                        let diamondId = state.chests.find(c => c.diamond).id;
+                                        let guessId;
+                                        
+                                        // Fixed 60% success chance for bot
+                                        if (Math.random() < 0.60) {
+                                            guessId = diamondId;
+                                        } else {
+                                            let wrongIds = state.chests.filter(c => !c.diamond).map(c => c.id);
+                                            guessId = wrongIds[Math.floor(Math.random() * wrongIds.length)];
+                                        }
+                                        actions.shell_click(guessId, currentUid);
+                                    }
+                                }, 1000 + Math.random() * 2500); // Simulates thinking time
+                            }
+                        }
+                    }
                 }
             },
 
@@ -1927,6 +2340,10 @@
                     let statHTML = showAsNumber 
                         ? `<span class="text-sm font-bold text-yellow-400 mt-1">${val} ${statIcon}</span>`
                         : `<div class="flex gap-1 text-sm md:text-base mt-1">${String(statIcon).repeat(Math.max(0, val))}</div>`;
+
+                    if (localState.settings.mode === 'betting') {
+                        statHTML = `<span class="text-sm font-bold text-yellow-400 mt-1">🪙 ${p.coins}</span>`;
+                    }
 
                     return `
                         <div class="flex flex-col items-center bg-slate-900 px-4 py-3 rounded-lg border ${uid === highlightUid ? 'border-green-500 shadow-[0_0_10px_#10b981] scale-105 transition-transform' : 'border-slate-700'} relative">
@@ -1956,6 +2373,38 @@
                 await updateDoc(logic.getRoomDoc(currentRoomId), { players: updatedPlayers });
             },
 
+            // --- AZIONI GLOBALI AGGIUNTIVE ---
+            next_round() {
+                hostEngine.startRound();
+            },
+            
+            finish_game() {
+                hostEngine.finishGame();
+            },
+
+            // --- AZIONE SCOMMESSE ---
+            async place_bet(targetUid, amount, overrideUid = null) {
+                const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
+                let gs = localState.gameState;
+                
+                if (gs.phase !== 'betting') return;
+                
+                let p = localState.players.find(x => x.uid === uid);
+                if (!p || p.coins < amount || (gs.bets && gs.bets[uid])) return; // Già scommesso o povero
+                
+                let newPlayers = JSON.parse(JSON.stringify(localState.players));
+                let myP = newPlayers.find(x => x.uid === uid);
+                myP.coins -= amount; // Deduci subito
+                
+                let newBets = { ...(gs.bets || {}) };
+                newBets[uid] = { target: targetUid, amount: amount };
+                
+                await updateDoc(logic.getRoomDoc(currentRoomId), {
+                    players: newPlayers,
+                    'gameState.bets': newBets
+                });
+            },
+
             // --- AZIONE SPECIALE HOST: FORZA RISOLUZIONE (Evita stalli bot) ---
             async force_resolve() {
                 if(!isHost || localState.gameState.phase !== 'playing') return;
@@ -1977,6 +2426,10 @@
                     // 3. Identifica chi non ha premuto in reaction
                     else if (gm.currentMinigame === 'reaction') {
                         targetLoser = pIds.find(id => state.winner !== id);
+                    }
+                    // 4. Identifica chi non ha votato nel trucco dei bicchieri
+                    else if (gm.currentMinigame === 'shell') {
+                        targetLoser = pIds.find(id => state.players[id] && state.players[id].guess === null);
                     }
 
                     // Se non c'è un colpevole chiaro (giochi simultanei) o per proteggere un umano, 
@@ -2275,6 +2728,20 @@
                     await this.updateState({ ...state, players: newPlayers, finishedPlayers: newFinishedPlayers });
                 }
             },
+            
+            // --- SHELL GAME ---
+            async shell_click(chestId, overrideUid = null) {
+                const uid = typeof overrideUid === 'string' ? overrideUid : user.uid;
+                let state = localState.gameState.minigameState;
+                
+                if(!state || localState.gameState.phase !== 'playing' || state.phase !== 'guess' || !state.players || !state.players[uid]) return;
+                if(state.players[uid].guess !== null) return;
+                
+                let newPlayers = JSON.parse(JSON.stringify(state.players));
+                newPlayers[uid].guess = chestId;
+                
+                await this.updateState({ ...state, players: newPlayers });
+            },
 
             // --- CHAT ---
             async send_chat() {
@@ -2325,12 +2792,34 @@
         // ==========================================
         const npcEngine = {
             tick(state, oldState) {
-                if(!isHost || state.gameState.phase !== 'playing') return;
+                if(!isHost) return;
+                const gm = state.gameState;
+                if(gm.phase !== 'playing' && gm.phase !== 'betting') return;
                 
                 // Track actions to prevent duplicate firing due to firebase snapshot spam
                 if (!window.npcActionHashes) window.npcActionHashes = {};
-
-                const gm = state.gameState;
+                
+                // --- BOT SCOMMESSE (Se Modalità Scommesse) ---
+                if (gm.phase === 'betting') {
+                    let pNpcs = state.players.filter(x => x.isAlive && !gm.selectedPlayers.includes(x.uid) && x.isNpc);
+                    pNpcs.forEach((npc, idx) => {
+                        let hash = `bet_${gm.round}_${npc.uid}`;
+                        if (window.npcActionHashes[hash] !== true) {
+                            window.npcActionHashes[hash] = true;
+                            setTimeout(() => {
+                                if (localState.gameState.phase === 'betting' && (!localState.gameState.bets || !localState.gameState.bets[npc.uid])) {
+                                    let target = gm.selectedPlayers[Math.floor(Math.random() * gm.selectedPlayers.length)];
+                                    let amountOptions = [10, 20, 30].filter(a => npc.coins >= a);
+                                    if (amountOptions.length > 0) {
+                                        let amount = amountOptions[Math.floor(Math.random() * amountOptions.length)];
+                                        actions.place_bet(target, amount, npc.uid);
+                                    }
+                                }
+                            }, 2000 + idx * 800 + Math.random() * 1500); // Scaglionati durante i 10 sec
+                        }
+                    });
+                    return; // Blocca ulteriori logiche NPC durante il betting
+                }
                 
                 // --- HOST CENTRALIZED RESOLUTIONS ---
                 
@@ -2530,6 +3019,72 @@
                         }, 500);
                     }
                 }
+                
+                // 7. Shell Game (Gestione fasi)
+                if (gm.currentMinigame === 'shell') {
+                    if (!window.shellHostChecker) {
+                        window.shellHostChecker = setInterval(async () => {
+                            if (localState.gameState.currentMinigame !== 'shell') { clearInterval(window.shellHostChecker); window.shellHostChecker = null; return; }
+                            let s = localState.gameState.minigameState;
+                            let now = Date.now();
+                            
+                            if (s.phase === 'reveal' && now >= s.endTime) {
+                                let numSwaps = 6 + (s.difficulty * 3);
+                                let swaps = [];
+                                let currentChests = JSON.parse(JSON.stringify(s.chests));
+                                
+                                for (let i = 0; i < numSwaps; i++) {
+                                    let a = Math.floor(Math.random() * currentChests.length);
+                                    let b = Math.floor(Math.random() * currentChests.length);
+                                    while (b === a) b = Math.floor(Math.random() * currentChests.length);
+                                    swaps.push({a, b}); // CHANGED: objects instead of arrays for nested arrays fix
+                                    
+                                    let temp = currentChests[a];
+                                    currentChests[a] = currentChests[b];
+                                    currentChests[b] = temp;
+                                }
+                                
+                                let swapSpeed = 400 - (s.difficulty * 50);
+                                await actions.updateState({ ...s, phase: 'shuffle', swaps, finalChests: currentChests, endTime: now + (numSwaps * swapSpeed) + 500 });
+                            }
+                            else if (s.phase === 'shuffle' && now >= s.endTime) {
+                                await actions.updateState({ ...s, phase: 'guess', chests: s.finalChests, endTime: now + 5000 });
+                            }
+                            else if (s.phase === 'guess' && now >= s.endTime) {
+                                await actions.updateState({ ...s, phase: 'result', endTime: now + 3000 });
+                            }
+                            else if (s.phase === 'result' && now >= s.endTime) {
+                                clearInterval(window.shellHostChecker); window.shellHostChecker = null;
+                                
+                                let newPlayers = JSON.parse(JSON.stringify(s.players));
+                                let elim = [];
+                                let isGameOver = false;
+                                let diamondId = s.chests.find(c => c.diamond).id;
+                                
+                                for (const uid of Object.keys(newPlayers)) {
+                                    if (newPlayers[uid].guess !== diamondId) {
+                                        newPlayers[uid].lives--;
+                                        await actions.recordStatLoss(uid);
+                                        if (newPlayers[uid].lives <= 0) { isGameOver = true; elim.push(uid); }
+                                    }
+                                }
+                                
+                                if (isGameOver) {
+                                    await hostEngine.resolveGame(elim);
+                                } else {
+                                    let nextDiff = s.difficulty + 1;
+                                    if (nextDiff > 3) nextDiff = 3; // Max 7 chest (4 + 3)
+                                    let chestCount = 4 + nextDiff;
+                                    let chests = Array(chestCount).fill(null).map((_, i) => ({ id: i, diamond: i === 0 }));
+                                    chests = ui.shuffle(chests);
+                                    for (let k in newPlayers) newPlayers[k].guess = null;
+                                    
+                                    await actions.updateState({ ...s, difficulty: nextDiff, chests, players: newPlayers, phase: 'reveal', endTime: Date.now() + 3000 });
+                                }
+                            }
+                        }, 500);
+                    }
+                }
 
                 const minigame = minigamesEngine.games[gm.currentMinigame];
                 if(!minigame || !minigame.npcTurn) return;
@@ -2562,7 +3117,7 @@
                         }
                     }
                 }
-                // Giochi simultanei (Dadi, Reaction, Mash, Votazione, Ricordello, Bomb, Treasure)
+                // Giochi simultanei (Dadi, Reaction, Mash, Votazione, Ricordello, Bomb, Treasure, Shell)
                 else {
                     let pNpcs = state.players.filter(x => pIds.includes(x.uid) && x.isNpc);
                     
@@ -2595,6 +3150,14 @@
                                         minigame.npcTurn(localState.gameState.minigameState, pIds, npc.uid);
                                     }
                                 }, 1000 + Math.random()*3000); // Simuliamo che il bot "pensi" un po' prima di scegliere la combinazione
+                            }
+                        } else if(gm.currentMinigame === 'shell') {
+                            let actionHash = `${gm.currentMinigame}_${gm.round}_${gm.minigameState.difficulty}_${gm.minigameState.phase}`;
+                            if (window.npcActionHashes['shell_' + npc.uid] !== actionHash) {
+                                window.npcActionHashes['shell_' + npc.uid] = actionHash;
+                                if (gm.minigameState.phase === 'guess') {
+                                    minigame.npcTurn(localState.gameState.minigameState, pIds, npc.uid); // Timeout is handled inside npcTurn
+                                }
                             }
                         } else if(gm.currentMinigame === 'treasure') {
                             let actionHash = `${gm.currentMinigame}_${gm.round}_loop`;
@@ -2690,6 +3253,8 @@
                 }
             }
         };
+
+        window.hostEngine = hostEngine;
 
         // ==========================================
         // INIT
