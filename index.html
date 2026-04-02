@@ -73,19 +73,35 @@
     </div>
 
     <!-- MAIN MENU -->
-    <div id="screen-menu" class="flex-1 flex flex-col items-center justify-center p-4">
-        <h1 class="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 mb-8 text-center">ELIMINATION<br>PARTY</h1>
+    <div id="screen-menu" class="flex-1 flex flex-col items-center justify-center p-4 overflow-y-auto">
+        <h1 class="text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 mb-8 text-center mt-8 md:mt-0">ELIMINATION<br>PARTY</h1>
         
-        <div class="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <div class="mb-6">
-                <label class="block text-sm font-medium text-slate-300 mb-2">Scegli il tuo Nickname</label>
-                <input type="text" id="input-nickname" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500" placeholder="Es. Player123" maxlength="15">
+        <div class="flex flex-col md:flex-row gap-8 w-full max-w-5xl justify-center items-stretch">
+            
+            <!-- Box Menu Principale -->
+            <div class="bg-slate-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Scegli il tuo Nickname</label>
+                    <input type="text" id="input-nickname" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500" placeholder="Es. Player123" maxlength="15">
+                </div>
+                <div class="space-y-4">
+                    <button onclick="ui.showScreen('create')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Crea Stanza (Host)</button>
+                    <button onclick="ui.showScreen('join')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Unisciti a una Stanza</button>
+                    <button onclick="ui.showScreen('test-select')" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg border border-orange-500">Prova Minigioco (Stanza Test)</button>
+                </div>
             </div>
-            <div class="space-y-4">
-                <button onclick="ui.showScreen('create')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Crea Stanza (Host)</button>
-                <button onclick="ui.showScreen('join')" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">Unisciti a una Stanza</button>
-                <button onclick="ui.showScreen('test-select')" class="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg border border-orange-500">Prova Minigioco (Stanza Test)</button>
+
+            <!-- Box Classifica Globale Top 5 -->
+            <div class="bg-slate-800/80 p-6 rounded-xl shadow-xl w-full max-w-sm border border-white/5 flex flex-col">
+                <h3 class="text-xl font-black mb-4 text-center text-yellow-400 uppercase tracking-widest flex items-center justify-center gap-2 drop-shadow-md">
+                    🏆 Top 5 Scelti
+                </h3>
+                <p class="text-xs text-slate-400 text-center mb-4">I personaggi più giocati dagli umani in tutto il mondo.</p>
+                <div id="top-characters-list" class="flex flex-col gap-2 flex-1">
+                    <p class="text-sm text-slate-500 text-center py-4">Caricamento classifica...</p>
+                </div>
             </div>
+            
         </div>
     </div>
 
@@ -478,6 +494,7 @@
         let isHost = false;
         let localState = {}; // Mantiene una copia dello stato
         let npcLogicIntervals = []; // Per pulire i timeout degli NPC
+        let unsubscribeGlobalStats = null; // Listener per la top 5
 
         // ==========================================
         // UI & UTILS
@@ -537,6 +554,39 @@
                     `;
                 }
                 container.innerHTML = html;
+            },
+            renderTopCharacters(usageData) {
+                const container = document.getElementById('top-characters-list');
+                if (!container) return;
+
+                // Converte l'oggetto in array e ordina per conteggio
+                const sortedChars = Object.entries(usageData)
+                    .map(([id, count]) => ({ id, count }))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 5); // Prende solo i primi 5
+
+                if (sortedChars.length === 0) {
+                    container.innerHTML = '<p class="text-sm text-slate-500 text-center py-4 italic">Nessuna partita registrata.</p>';
+                    return;
+                }
+
+                container.innerHTML = sortedChars.map((item, index) => {
+                    const charData = this.getChar(item.id);
+                    if(!charData) return '';
+                    let medalColor = index === 0 ? 'text-yellow-400' : (index === 1 ? 'text-slate-300' : (index === 2 ? 'text-orange-400' : 'text-blue-400'));
+                    return `
+                        <div class="flex items-center justify-between bg-slate-900 p-2 rounded-lg border border-slate-700">
+                            <div class="flex items-center gap-3">
+                                <span class="font-black ${medalColor} w-4 text-center">${index + 1}°</span>
+                                <img src="${charData.url}" class="w-10 h-10 rounded-full object-cover border border-slate-600">
+                                <span class="font-bold text-sm text-white">${charData.name}</span>
+                            </div>
+                            <div class="bg-slate-800 px-3 py-1 rounded text-xs font-bold text-green-400 border border-slate-600">
+                                ${item.count} <span class="text-slate-500 text-[10px] uppercase">pick</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
             }
         };
 
@@ -561,6 +611,24 @@
             
             getRoomsRef() { return collection(db, 'artifacts', appId, 'public', 'data', 'rooms'); },
             getRoomDoc(id) { return doc(db, 'artifacts', appId, 'public', 'data', 'rooms', id); },
+
+            listenToGlobalStats() {
+                if(!user) return; // Sicurezza: Firestore richiede auth
+                if(unsubscribeGlobalStats) unsubscribeGlobalStats();
+                
+                const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'global_stats', 'character_usage');
+                
+                unsubscribeGlobalStats = onSnapshot(statsRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        ui.renderTopCharacters(docSnap.data());
+                    } else {
+                        ui.renderTopCharacters({});
+                    }
+                }, (err) => {
+                    console.error("Errore lettura statistiche globali:", err);
+                    document.getElementById('top-characters-list').innerHTML = '<p class="text-sm text-red-500 text-center py-4">Errore caricamento dati.</p>';
+                });
+            },
 
             updateNPCCount() {
                 const total = parseInt(document.getElementById('input-total-players').value) || 15;
@@ -875,6 +943,24 @@
                         coins: 100, // SCOMMESSE
                         stats: { minigames: 0, wins: 0, livesLost: 0, order: 0 }
                     });
+                }
+
+                // Salva statistiche globali dei personaggi scelti dagli umani (Solo l'Host lo fa 1 volta ad inizio partita)
+                try {
+                    const humansWithChars = players.filter(p => !p.isNpc && p.charId);
+                    if (humansWithChars.length > 0) {
+                        const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'global_stats', 'character_usage');
+                        const snap = await getDoc(statsRef);
+                        let usageData = snap.exists() ? snap.data() : {};
+                        
+                        humansWithChars.forEach(h => {
+                            usageData[h.charId] = (usageData[h.charId] || 0) + 1;
+                        });
+                        
+                        await setDoc(statsRef, usageData);
+                    }
+                } catch(e) {
+                    console.error("Errore salvataggio statistiche globali", e);
                 }
 
                 await updateDoc(logic.getRoomDoc(currentRoomId), {
@@ -3259,8 +3345,9 @@
         // ==========================================
         // INIT
         // ==========================================
-        window.onload = () => {
-            logic.initAuth();
+        window.onload = async () => {
+            await logic.initAuth(); // Attendi l'autenticazione PRIMA di leggere il database
+            logic.listenToGlobalStats(); // Avvia il listener in tempo reale della classifica
             ui.renderTestSelect(); // Pre-compila la griglia di test
             ui.showScreen('menu');
         };
